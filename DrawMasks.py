@@ -13,7 +13,7 @@ class DrawPolyMaskOpto(QWidget):
     or hide masks
     """
 
-    mask_drawn = pyqtSignal(int, int, np.ndarray)
+    mask_drawn = pyqtSignal(int, int, np.ndarray) #ID, Bool, mask_gray?
 
     def __init__(self, drawer: DrawPolyMask, *args, **kwargs):
     

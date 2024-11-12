@@ -18,7 +18,7 @@ if __name__ == "__main__":
     # zmq settings
     PROTOCOL = "tcp://"
     HOST = "o1-317"
-    PORT = 5555
+    PORT = 5556
     
     # dmd settings
     SCREEN_DMD = 1
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
     try:
-        with open('calibration_4x/calibration.json', 'r') as f:
+        with open('calibration.json', 'r') as f:
             calibration = json.load(f)
 
         # 0: cam, 1: dmd, 2: twop
