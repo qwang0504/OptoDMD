@@ -1,5 +1,5 @@
 import cv2
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScrollArea, QPushButton, QFrame, QLineEdit, QCheckBox
 import numpy as np
 from numpy.typing import NDArray
@@ -189,6 +189,7 @@ class MaskItem(QWidget):
     showClicked = pyqtSignal(int,int)
     deletePressed = pyqtSignal(int)
     maskExpose = pyqtSignal(int)
+    nameChange = pyqtSignal(int, str)
 
     def __init__(self, mask_index: int, name: Optional[str] = "name", *args, **kwargs):
 
@@ -230,6 +231,7 @@ class MaskItem(QWidget):
     
     def change_name(self):
         self.name = self.name_label.text()
+        self.nameChange.emit(self.mask_index, self.name)
 
     def show_clicked(self):
         visible = (self.show.checkState() == Qt.Checked)
@@ -350,6 +352,18 @@ class MaskManager(QWidget):
         widget.maskExpose.connect(self.on_mask_expose)
         self.mask_widgets[key] = widget
         self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
+        #test code that uses signals and slots to print the name change signal 
+        #self.mask_widgets[key].nameChange.connect(self.print_names_signal)  
+ 
+    #test method to print modified mask names 
+    def print_names(self):
+        keys = self.mask_widgets.keys()
+        for key in keys:
+            if str(key) != self.mask_widgets[key].name:
+                print(f'name changed from {key} to {self.mask_widgets[key].name}')
+
+    def print_names_signal(self, key: int, name: str):
+        print(f'name changed from {key} to {self.mask_widgets[key].name}')
 
     def on_delete_mask(self, key: int):
 

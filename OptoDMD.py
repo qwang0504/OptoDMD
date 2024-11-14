@@ -77,6 +77,7 @@ if __name__ == "__main__":
 
     masks = MaskManager([cam_mask, dmd_mask, twop_mask], ["Camera", "DMD", "Two Photon"], transformations)
     masks.show()
+    masks.print_names()
 
     # connect signals and slots
     dmd_mask.DMD_update.connect(dmd_widget.update_image)

@@ -40,8 +40,14 @@ class PulseSender(QRunnable):
 
     def run(self):
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=self.duty_cycle, frequency=self.pwm_frequency)
+        time_start = time.time() 
         time.sleep(self.pulse_duration_ms/1000.0)
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=0, frequency=self.pwm_frequency)
+        time_end = time.time()
+        print('start: ', time_start)
+        print('end: ', time_end)
+        duration = time_end - time_start
+        print('duration: ', duration)
 
 
 class LEDD1B:
