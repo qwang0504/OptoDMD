@@ -297,7 +297,7 @@ class LabJackU3LV_new:
         # Configure the timer for 16-bit PWM
         time_start_pwm = time.time()
         self.device.getFeedback(u3.TimerConfig(timer=0, TimerMode=timer_mode, Value=value))
-        print(time_start_pwm)
+        print('start_pwm: ', time_start_pwm)
 
     def close(self) -> None:
         self.device.close()
