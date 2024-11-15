@@ -11,7 +11,9 @@ from PyQt5.QtCore import QThreadPool
 import sys
 import matplotlib.pyplot as plt
 import matplotlib
+import time
 matplotlib.use('Qt5Agg')
+from video_writer import OpenCV_VideoWriter
 
 
 app = QApplication(sys.argv)

@@ -1,6 +1,6 @@
 from Microscope import ImageSender, ScanImage
 from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
-from daq import LabJackU3LV
+from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
 from camera_tools import XimeaCamera, CameraControl
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     camera_controls.show()
 
     # Control LEDs
-    daio = LabJackU3LV()
+    daio = LabJackU3LV_new()
     led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
     led_widget = LEDWidget(led_drivers=[led])
     led_widget.show()
