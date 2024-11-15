@@ -238,17 +238,17 @@ class LabJackU3LV_new:
         self.device.configIO(NumberOfTimersEnabled=0)
         if bit == 1: #8-bit = 1
             if channel==0:
-                DAC_VALUE = d.voltageToDACBits(val, dacNumber = 0, is16Bits = False)
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 0, is16Bits = False)
                 self.device.getFeedback(u3.DAC0_8(Value=DAC_VALUE))
             else:
-                DAC_VALUE = d.voltageToDACBits(val, dacNumber = 1, is16Bits = False)
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 1, is16Bits = False)
                 self.device.getFeedback(u3.DAC1_8(Value=DAC_VALUE))
         elif bit == 0: #16-bit = 0
             if channel==0:
-                DAC_VALUE = d.voltageToDACBits(val, dacNumber = 0, is16Bits = True)
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 0, is16Bits = True)
                 self.device.getFeedback(u3.DAC0_16(Value=DAC_VALUE))
             else:
-                DAC_VALUE = d.voltageToDACBits(val, dacNumber = 1, is16Bits = True)
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 1, is16Bits = True)
                 self.device.getFeedback(u3.DAC1_16(Value=DAC_VALUE))
         #DAC channels! 0 or 1 for DAC0 or DAC1, bits for 8-bit or 16-bits 
         # self.device.writeRegister(self.channels['AnalogOutput'][channel], val)
