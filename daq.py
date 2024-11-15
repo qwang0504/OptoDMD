@@ -307,68 +307,68 @@ class LabJackU3LV_new:
     #digital direction (1 or 0)
     #if output, high or low state (1 or 0)
 
-import u3
-import time
-import numpy as np
-d = u3.U3()
-d.configIO()
-d.configIO(FIOAnalog=0)
+# import u3
+# import time
+# import numpy as np
+# d = u3.U3()
+# d.configIO()
+# d.configIO(FIOAnalog=0)
 
-# d.configIO(NumberOfTimersEnabled=0, TimerCounterPinOffset=5)
+# # d.configIO(NumberOfTimersEnabled=0, TimerCounterPinOffset=5)
 
-d.configIO(NumberOfTimersEnabled=1, TimerCounterPinOffset=5)
+# d.configIO(NumberOfTimersEnabled=1, TimerCounterPinOffset=5)
 
-# d.configIO(FIOAnalog=15)
-d.configTimerClock(TimerClockBase=3, TimerClockDivisor=256)
-d.getFeedback(u3.TimerConfig(timer = 0, TimerMode = 1, Value = 40000))
+# # d.configIO(FIOAnalog=15)
+# d.configTimerClock(TimerClockBase=3, TimerClockDivisor=256)
+# d.getFeedback(u3.TimerConfig(timer = 0, TimerMode = 1, Value = 40000))
 
-d.getFeedback(u3.BitStateRead(5))
-d.getFeedback(u3.BitStateWrite(5, 0))
-d.getFeedback(u3.Timer0Config(0, 40000))
+# d.getFeedback(u3.BitStateRead(5))
+# d.getFeedback(u3.BitStateWrite(5, 0))
+# d.getFeedback(u3.Timer0Config(0, 40000))
 
-#Timer modes
-# 0 = 16-bit PWM
-# 1 = 8-bit PWM
-# refer to p. 24-25 / Section 2.9.1
+# #Timer modes
+# # 0 = 16-bit PWM
+# # 1 = 8-bit PWM
+# # refer to p. 24-25 / Section 2.9.1
 
-#values passed indicate %time spent LOW
-#48 MHz with divisors (ClockBase = 6)
-#16-bit range: 2.861 - 732.42
-#8-bit range: 732.422 - 187500
-
-
-duration = 10
-bits = []
-start = time.time()
-while time.time() < start + duration: 
-    bits.append(d.getFeedback(u3.BitStateRead(5))[0])
-
-sum([i==0 for i in bits ])/len(bits) 
-40000/65536
-
-len(np.where(np.diff(bits) > 0)[0])/duration
-
-d.getFeedback(u3.DAC0_16(30000))
+# #values passed indicate %time spent LOW
+# #48 MHz with divisors (ClockBase = 6)
+# #16-bit range: 2.861 - 732.42
+# #8-bit range: 732.422 - 187500
 
 
-DAC0_VALUE = d.voltageToDACBits(4, dacNumber = 0, is16Bits = False)
-d.getFeedback(u3.DAC0_8(DAC0_VALUE))
-#make AIN1 analog input 
-channel=1
-d.configIO(FIOAnalog=2**channel) 
-ain0bits = d.getFeedback(u3.AIN(1))
+# duration = 10
+# bits = []
+# start = time.time()
+# while time.time() < start + duration: 
+#     bits.append(d.getFeedback(u3.BitStateRead(5))[0])
 
-d.getAIN(1)
+# sum([i==0 for i in bits ])/len(bits) 
+# 40000/65536
 
-import matplotlib.pyplot as plt
+# len(np.where(np.diff(bits) > 0)[0])/duration
 
-duration = 60
-bits = []
-start = time.time()
-while time.time() < start + duration: 
-    bits.append(d.getAIN(1))
+# d.getFeedback(u3.DAC0_16(30000))
 
-plt.plot(bits)
-plt.show()
 
-plt.close()
+# DAC0_VALUE = d.voltageToDACBits(4, dacNumber = 0, is16Bits = False)
+# d.getFeedback(u3.DAC0_8(DAC0_VALUE))
+# #make AIN1 analog input 
+# channel=1
+# d.configIO(FIOAnalog=2**channel) 
+# ain0bits = d.getFeedback(u3.AIN(1))
+
+# d.getAIN(1)
+
+# import matplotlib.pyplot as plt
+
+# duration = 60
+# bits = []
+# start = time.time()
+# while time.time() < start + duration: 
+#     bits.append(d.getAIN(1))
+
+# plt.plot(bits)
+# plt.show()
+
+# plt.close()
