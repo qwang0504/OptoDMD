@@ -30,8 +30,14 @@ class OpenCV_VideoWriter(VideoWriter):
         self.fps = fps
         self.filename = filename
         self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
-        color = True
-        self.writer = cv2.VideoWriter(filename, self.fourcc, fps, (width, height), color)
+        self.color = True
+        # self.writer = cv2.VideoWriter(filename, self.fourcc, fps, (width, height), color)
+        self.writer = None
+        self.ready = False
+
+    def start_writing(self, ready):
+        if ready:
+            self.writer = cv2.VideoWriter(self.filename, self.fourcc, self.fps, (self.width, self.height), self.color)
 
     def write_frame(self, image: NDArray) -> None:
         if len(image.shape) == 2:
