@@ -21,25 +21,25 @@ app = QApplication(sys.argv)
 cam = XimeaCamera(0)
 # cam = OpenCV_Webcam()
 # cam = RandomCam((512, 512), dtype=np.float64)
-# camera_controls = CameraControl(cam)
-# camera_controls.show()
-
-camera_controls = CameraControlRecording(cam)
+camera_controls = CameraControl(cam)
 camera_controls.show()
+
+# camera_controls = CameraControlRecording(cam)
+# camera_controls.show()
 
 # preview = CameraPreview(camera_controls)
 # preview.show()
 
 app.exec()
 
-img = cam.get_frame().image
-plt.imshow(img)
-plt.show()
+# img = cam.get_frame().image
+# plt.imshow(img)
+# plt.show()
 
-cam.time_start
-cam.img_count
-cam.get_frame().timestamp
+# cam.time_start
+# cam.img_count
+# cam.get_frame().timestamp
 
-QApplication.quit()
+# QApplication.quit()
 
-videowriter = OpenCV_VideoWriter(height=500, width=400)
+# videowriter = OpenCV_VideoWriter(height=500, width=400)
