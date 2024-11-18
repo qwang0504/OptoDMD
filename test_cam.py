@@ -3,8 +3,8 @@ from camera_tools.frame import Frame, BaseFrame
 from typing import Optional, Tuple
 from ximea import xiapi
 from numpy.typing import NDArray
-from camera_tools import XimeaCamera, CameraControl
-from camera_tools import CameraControl, OpenCV_Webcam, RandomCam, CameraPreview
+from camera_tools import XimeaCamera
+from camera_tools import RandomCam, CameraPreview
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
@@ -14,17 +14,21 @@ import matplotlib
 import time
 matplotlib.use('Qt5Agg')
 from video_writer import OpenCV_VideoWriter
+from camera_widgets_new import CameraControl, CameraControlRecording
 
 
 app = QApplication(sys.argv)
-# cam = XimeaCamera(1)
+cam = XimeaCamera(0)
 # cam = OpenCV_Webcam()
-cam = RandomCam((512, 512), dtype=np.float64)
-camera_controls = CameraControl(cam)
+# cam = RandomCam((512, 512), dtype=np.float64)
+# camera_controls = CameraControl(cam)
+# camera_controls.show()
+
+camera_controls = CameraControlRecording(cam)
 camera_controls.show()
 
-preview = CameraPreview(camera_controls)
-preview.show()
+# preview = CameraPreview(camera_controls)
+# preview.show()
 
 app.exec()
 
@@ -37,3 +41,5 @@ cam.img_count
 cam.get_frame().timestamp
 
 QApplication.quit()
+
+videowriter = OpenCV_VideoWriter(height=500, width=400)
