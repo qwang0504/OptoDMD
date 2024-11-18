@@ -73,7 +73,7 @@ class FrameRecorder(QRunnable):
         self.keepgoing = False
 
     def set_filename(self, filename):
-        self.recorder.filename = filename + '.avi'
+        self.recorder.filename = 'test/' + filename + '.avi'
 
     def set_fps(self, fps):
         self.recorder.fps = fps
@@ -90,9 +90,55 @@ class FrameRecorder(QRunnable):
         self.recorder.close()
 
 
+class FrameRecorderSingle(QRunnable):
+
+    def __init__(self, camera: Camera, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.camera = camera
+
+        self.recording_started = False
+        self.keepgoing = True
+
+    # def start_acquisition(self):
+    #     self.acquisition_started = True
+
+    def start_recording(self):
+        self.recording_started = True
+        self.camera.start_acquisition()
+
+    def stop_acquisition(self):
+        self.acquisition_started = False
+
+    def terminate(self):
+        self.keepgoing = False
+
+    def set_filename(self, filename):
+        self.filename = 'test/' + filename 
+
+    def set_fps(self, fps):
+        self.fps = fps
+        
+    def set_fourcc(self, fourcc):
+        self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
+
+    def run(self):
+        idx = 0
+        while self.keepgoing:
+            if self.recording_started:
+                frame = self.camera.get_frame()
+                if frame.image is not None:
+                    cv2.imwrite(self.filename + str(idx) + '.tiff', frame.img)
+                    idx += 1
+
+
 class CameraControl(QWidget):
 
     image_ready = pyqtSignal(np.ndarray)
+    filename_ready = pyqtSignal(str)
+    fps_ready = pyqtSignal(int)
+    fourcc_ready = pyqtSignal(str)
 
     def __init__(self, camera: Camera, *args, **kwargs):
 
@@ -106,9 +152,13 @@ class CameraControl(QWidget):
         self.thread_pool = QThreadPool()
         self.thread_pool.start(self.sender)
 
-        self.recorder = FrameRecorder(camera)
+        self.recorder = FrameRecorderSingle(camera)
         self.thread_pool_r = QThreadPool()
         self.thread_pool_r.start(self.recorder)
+
+        self.filename_ready.connect(self.recorder.set_filename)
+        self.fps_ready.connect(self.recorder.set_fps)
+        self.fourcc_ready.connect(self.recorder.set_fourcc)
 
         self.acquisition_started = False
         self.controls = [
@@ -200,15 +250,15 @@ class CameraControl(QWidget):
 
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('file_name.avi')
-        self.file_name_input.textEdited.connect(self.set_filename)
+        self.file_name_input.editingFinished.connect(self.set_filename)
 
         self.encoding_fps_input = QLineEdit(self)
         self.encoding_fps_input.setPlaceholderText('encoding fps in integers')
-        self.encoding_fps_input.textEdited.connect(self.set_fps)
+        self.encoding_fps_input.editingFinished.connect(self.set_fps)
 
         self.fourcc_input = QLineEdit(self)
         self.fourcc_input.setPlaceholderText('fourcc code in capital letters')
-        self.fourcc_input.textEdited.connect(self.set_fourcc)
+        self.fourcc_input.editingFinished.connect(self.set_fourcc)
 
         # controls 
         for c in self.controls:
@@ -242,6 +292,7 @@ class CameraControl(QWidget):
         layout_controls.addWidget(self.file_name_input)
         layout_controls.addWidget(self.encoding_fps_input)
         layout_controls.addWidget(self.fourcc_input)
+        layout_controls.addLayout(layout_start_stop)
         layout_controls.addWidget(self.ROI_groupbox)
         layout_controls.addLayout(layout_start_stop)
         layout_controls.addStretch()
@@ -263,16 +314,30 @@ class CameraControl(QWidget):
             self.sender.stop_acquisition()
             self.camera.stop_acquisition()
             self.acquisition_started = False
-
+    
     def start_recording(self):
         if not self.acquisition_started:
-            self.camera.start_acquisition()
-            self.recorder.start_acquisition()
+            # self.camera.start_acquisition()
+            self.recorder.start_recording()
             self.acquisition_started = True
 
     def stop_recording(self):
-        self.recorder.terminate()
-        self.stop_acquisition()
+        if self.acquisition_started:
+            self.recorder.terminate()
+            self.camera.stop_acquisition()
+            self.acquisition_started = False
+
+    def set_filename(self):
+        filename = self.file_name_input.text()
+        self.filename_ready.emit(filename)
+
+    def set_fps(self):
+        fps = int(self.encoding_fps_input.text())
+        self.fps_ready.emit(fps)
+
+    def set_fourcc(self):
+        fourcc = self.fourcc_input.text()
+        self.fourcc_ready.emit(fourcc)
 
     def set_exposure(self):
         self.camera.set_exposure(self.exposure_spinbox.value())
@@ -301,7 +366,6 @@ class CameraControl(QWidget):
     def set_height(self):
         self.camera.set_height(int(self.height_spinbox.value()))
         self.update_values()
-
 
 
 class CameraControlRecording(QWidget):
