@@ -33,7 +33,6 @@ class OpenCV_VideoWriter(VideoWriter):
         self.color = True
         # self.writer = cv2.VideoWriter(filename, self.fourcc, fps, (width, height), color)
         self.writer = None
-        self.ready = False
 
     def start_writing(self, ready):
         if ready:
