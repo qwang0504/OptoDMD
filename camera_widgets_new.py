@@ -93,6 +93,9 @@ class FrameWriter(QRunnable):
 class CameraControl(QWidget):
 
     image_ready = pyqtSignal(np.ndarray)
+    filename_ready = pyqtSignal(str)
+    fps_ready = pyqtSignal(int)
+    fourcc_ready = pyqtSignal(str)
 
     def __init__(self, camera: Camera, *args, **kwargs):
 
@@ -200,15 +203,15 @@ class CameraControl(QWidget):
 
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('file_name.avi')
-        self.file_name_input.textEdited.connect(self.set_filename)
+        self.file_name_input.editingFinished.connect(self.set_filename)
 
         self.encoding_fps_input = QLineEdit(self)
         self.encoding_fps_input.setPlaceholderText('encoding fps in integers')
-        self.encoding_fps_input.textEdited.connect(self.set_fps)
+        self.encoding_fps_input.editingFinished.connect(self.set_fps)
 
         self.fourcc_input = QLineEdit(self)
         self.fourcc_input.setPlaceholderText('fourcc code in capital letters')
-        self.fourcc_input.textEdited.connect(self.set_fourcc)
+        self.fourcc_input.editingFinished.connect(self.set_fourcc)
 
         # controls 
         for c in self.controls:
@@ -242,6 +245,7 @@ class CameraControl(QWidget):
         layout_controls.addWidget(self.file_name_input)
         layout_controls.addWidget(self.encoding_fps_input)
         layout_controls.addWidget(self.fourcc_input)
+        layout_controls.addLayout(layout_start_stop)
         layout_controls.addWidget(self.ROI_groupbox)
         layout_controls.addLayout(layout_start_stop)
         layout_controls.addStretch()
@@ -263,7 +267,7 @@ class CameraControl(QWidget):
             self.sender.stop_acquisition()
             self.camera.stop_acquisition()
             self.acquisition_started = False
-
+    
     def start_recording(self):
         if not self.acquisition_started:
             self.camera.start_acquisition()
@@ -301,7 +305,6 @@ class CameraControl(QWidget):
     def set_height(self):
         self.camera.set_height(int(self.height_spinbox.value()))
         self.update_values()
-
 
 
 class CameraControlRecording(QWidget):
