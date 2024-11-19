@@ -66,8 +66,9 @@ class FrameWriter(QRunnable):
         self.camera.start_acquisition()
         self.writer.start_writing(self.recording_started)
 
-    def stop_acquisition(self):
-        self.acquisition_started = False
+    def stop_recording(self):
+        self.recording_started = False
+        self.camera.stop_acquisition()
 
     def terminate(self):
         self.keepgoing = False
@@ -88,6 +89,49 @@ class FrameWriter(QRunnable):
                 if frame.image is not None:
                     self.writer.write_frame(frame.image)
         self.writer.close()
+
+class FrameWriterSingle(QRunnable):
+
+    def __init__(self, camera: Camera, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.camera = camera
+
+        self.recording_started = False
+        self.keepgoing = True
+
+    # def start_acquisition(self):
+    #     self.acquisition_started = True
+
+    def start_recording(self):
+        self.recording_started = True
+        self.camera.start_acquisition()
+
+    def stop_recording(self):
+        self.recording_started = False
+        self.camera.stop_acquisition()
+
+    def terminate(self):
+        self.keepgoing = False
+
+    def set_filename(self, filename):
+        self.filename = 'test/' + filename 
+
+    def set_fps(self, fps):
+        self.fps = fps
+        
+    def set_fourcc(self, fourcc):
+        self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
+
+    def run(self):
+        idx = 0
+        while self.keepgoing:
+            if self.recording_started:
+                frame = self.camera.get_frame()
+                if frame.image is not None:
+                    cv2.imwrite(self.filename + str(idx) + '.tiff', frame.img)
+                    idx += 1
 
 
 class CameraControl(QWidget):
