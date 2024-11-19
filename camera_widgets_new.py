@@ -43,7 +43,7 @@ class FrameSender(QRunnable):
                     self.signal.image_ready.emit(frame.image)
 
 
-class FrameRecorder(QRunnable):
+class FrameWriter(QRunnable):
 
     def __init__(self, camera: Camera, *args, **kwargs):
 
@@ -56,7 +56,7 @@ class FrameRecorder(QRunnable):
 
         self.height = int(self.camera.get_height())
         self.width = int(self.camera.get_width())
-        self.recorder = OpenCV_VideoWriter(height=self.height, width=self.width)
+        self.writer = OpenCV_VideoWriter(height=self.height, width=self.width)
     
     # def start_acquisition(self):
     #     self.acquisition_started = True
@@ -64,7 +64,7 @@ class FrameRecorder(QRunnable):
     def start_recording(self):
         self.recording_started = True
         self.camera.start_acquisition()
-        self.recorder.start_writing(self.recording_started)
+        self.writer.start_writing(self.recording_started)
 
     def stop_acquisition(self):
         self.acquisition_started = False
@@ -73,21 +73,21 @@ class FrameRecorder(QRunnable):
         self.keepgoing = False
 
     def set_filename(self, filename):
-        self.recorder.filename = filename + '.avi'
+        self.writer.filename = filename + '.avi'
 
     def set_fps(self, fps):
-        self.recorder.fps = fps
+        self.writer.fps = fps
         
     def set_fourcc(self, fourcc):
-        self.recorder.fourcc = cv2.VideoWriter_fourcc(*fourcc)
+        self.writer.fourcc = cv2.VideoWriter_fourcc(*fourcc)
 
     def run(self):
         while self.keepgoing:
-            if self.recording_started and self.recorder.writer is not None:
+            if self.recording_started and self.writer.writer is not None:
                 frame = self.camera.get_frame()
                 if frame.image is not None:
-                    self.recorder.write_frame(frame.image)
-        self.recorder.close()
+                    self.writer.write_frame(frame.image)
+        self.writer.close()
 
 
 class CameraControl(QWidget):
@@ -106,9 +106,9 @@ class CameraControl(QWidget):
         self.thread_pool = QThreadPool()
         self.thread_pool.start(self.sender)
 
-        self.recorder = FrameRecorder(camera)
+        self.writer = FrameWriter(camera)
         self.thread_pool_r = QThreadPool()
-        self.thread_pool_r.start(self.recorder)
+        self.thread_pool_r.start(self.writer)
 
         self.acquisition_started = False
         self.controls = [
@@ -267,11 +267,11 @@ class CameraControl(QWidget):
     def start_recording(self):
         if not self.acquisition_started:
             self.camera.start_acquisition()
-            self.recorder.start_acquisition()
+            self.writer.start_recording()
             self.acquisition_started = True
 
     def stop_recording(self):
-        self.recorder.terminate()
+        self.writer.terminate()
         self.stop_acquisition()
 
     def set_exposure(self):
@@ -318,13 +318,13 @@ class CameraControlRecording(QWidget):
         
         self.acquisition_started = False
 
-        self.recorder = FrameRecorder(camera)
+        self.writer = FrameWriter(camera)
         self.thread_pool = QThreadPool()
-        self.thread_pool.start(self.recorder)
+        self.thread_pool.start(self.writer)
 
-        self.filename_ready.connect(self.recorder.set_filename)
-        self.fps_ready.connect(self.recorder.set_fps)
-        self.fourcc_ready.connect(self.recorder.set_fourcc)
+        self.filename_ready.connect(self.writer.set_filename)
+        self.fps_ready.connect(self.writer.set_fps)
+        self.fourcc_ready.connect(self.writer.set_fourcc)
 
         self.declare_components()
         self.layout_components()
@@ -368,18 +368,18 @@ class CameraControlRecording(QWidget):
      # Callbacks --------------------------------------------------------- 
 
     def closeEvent(self, event):
-        self.recorder.terminate()
+        self.writer.terminate()
         self.camera.stop_acquisition()
 
     def start_recording(self):
         if not self.acquisition_started:
             # self.camera.start_acquisition()
-            self.recorder.start_recording()
+            self.writer.start_recording()
             self.acquisition_started = True
 
     def stop_recording(self):
         if self.acquisition_started:
-            self.recorder.terminate()
+            self.writer.terminate()
             # self.camera.stop_acquisition()
             self.acquisition_started = False
 
