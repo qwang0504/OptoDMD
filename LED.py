@@ -65,7 +65,7 @@ class LEDD1B:
             self, 
             DAIO: DigitalAnalogIO, 
             pwm_frequency: float = 1000, 
-            pwm_channel: int = 5,
+            pwm_channel: int = 6,
             name: str = 'LED'
         ) -> None:
 
