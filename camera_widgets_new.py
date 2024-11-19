@@ -150,6 +150,7 @@ class CameraControl(QWidget):
         self.sender = FrameSender(camera)
         # this is breaking encapsulation a bit 
         self.sender.signal.image_ready.connect(self.image_ready)
+        self.sender.signal.image_ready.connect(self.update_image)
         self.thread_pool = QThreadPool()
         self.thread_pool.start(self.sender)
 
@@ -257,6 +258,8 @@ class CameraControl(QWidget):
         self.fourcc_input.setPlaceholderText('fourcc code in capital letters')
         self.fourcc_input.editingFinished.connect(self.set_fourcc)
 
+        self.image_label = QLabel()
+        
         # controls 
         for c in self.controls:
             self.create_spinbox(c)
@@ -291,6 +294,7 @@ class CameraControl(QWidget):
         layout_controls.addWidget(self.fourcc_input)
         layout_controls.addLayout(layout_start_stop)
         layout_controls.addWidget(self.ROI_groupbox)
+        layout_controls.addWidget(self.image_label)
         layout_controls.addLayout(layout_start_stop)
         layout_controls.addStretch()
 
@@ -349,6 +353,10 @@ class CameraControl(QWidget):
     def set_height(self):
         self.camera.set_height(int(self.height_spinbox.value()))
         self.update_values()
+
+    def update_image(self, image: np.ndarray):
+        self.image_label.setPixmap(NDarray_to_QPixmap(image))
+        
 
 
 class CameraControlRecording(QWidget):
