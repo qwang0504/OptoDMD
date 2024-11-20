@@ -27,7 +27,7 @@ class StimManager(QWidget):
         # self.daio = daio
         self.led_driver = led_driver
         self.mask_keys = list(self.mask_widgets.keys())
-        self.shuffled_mask_list = None
+        self.shuffled_mask_keys = None
 
         # self.get_checked_masks()
         self.create_components()
@@ -71,41 +71,43 @@ class StimManager(QWidget):
 
         self.start_stim_button = QPushButton(self)
         self.start_stim_button.setText('Start stimulation')
-        self.start_stim_button.connect(self.start_stim)
+        self.start_stim_button.clicked.connect(self.start_stim)
 
         # list display showing the shuffled masks order 
         self.shuffled_masks_display = QListWidget(self)
         self.shuffled_masks_names = []
-        for key in self.shuffled_mask_keys:
-            self.shuffled_masks_names.append(self.mask_widgets[key].name)
+        if self.shuffled_mask_keys is not None:
+            for key in self.shuffled_mask_keys:
+                self.shuffled_masks_names.append(self.mask_widgets[key].name)
         self.shuffled_masks_display.addItems(self.shuffled_masks_names)
         
 
     def layout_components(self):
-        self.layout_overall = QHBoxLayout()
-
-        self.layout_shuffle = QVBoxLayout()
-        self.layout_shuffle.addWidget(self.shuffle_button)
-        self.layout_shuffle.addWidget(self.shuffled_masks_display)
-
-        self.layout_overall.addLayout(self.layout_shuffle)
         
-        self.layout_controls = QVBoxLayout()
+        layout_overall = QHBoxLayout(self)
 
-        self.layout_trial_controls = QHBoxLayout()
-        self.layout_trial_controls.addWidget(self.rep_spinbox)
-        self.layout_trial_controls.addWidget(self.interval_spinbox)
+        layout_shuffle = QVBoxLayout()
+        layout_shuffle.addWidget(self.shuffle_button)
+        layout_shuffle.addWidget(self.shuffled_masks_display)
 
-        self.layout_controls.addLayout(self.layout_trial_controls)
+        layout_overall.addLayout(layout_shuffle)
+        
+        layout_controls = QVBoxLayout()
 
-        self.layout_led_controls = QHBoxLayout()
-        self.layout_led_controls.addWidget(self.intensity_slider)
-        self.layout_led_controls.addWidget(self.freq_spinbox)
-        self.layout_led_controls.addWidget(self.duration_spinbox)
+        layout_trial_controls = QHBoxLayout()
+        layout_trial_controls.addWidget(self.rep_spinbox)
+        layout_trial_controls.addWidget(self.interval_spinbox)
 
-        self.layout_controls.addLayout(self.layout_led_controls)
+        layout_controls.addLayout(layout_trial_controls)
 
-        self.layout_overall.addLayout(self.layout_controls)
+        layout_led_controls = QHBoxLayout()
+        layout_led_controls.addWidget(self.intensity_slider)
+        layout_led_controls.addWidget(self.freq_spinbox)
+        layout_led_controls.addWidget(self.duration_spinbox)
+
+        layout_controls.addLayout(layout_led_controls)
+
+        layout_overall.addLayout(layout_controls)
         
     # shuffling with or without identical consecutive elements?
     # def randomise(self, masks, reps):
