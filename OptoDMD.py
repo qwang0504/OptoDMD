@@ -7,6 +7,7 @@ from camera_tools import XimeaCamera, CameraControl
 from camera_tools import CameraControl, OpenCV_Webcam
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
+from stimulation import StimManager
 
 import sys
 import numpy as np
@@ -77,11 +78,15 @@ if __name__ == "__main__":
 
     masks = MaskManager([cam_mask, dmd_mask, twop_mask], ["Camera", "DMD", "Two Photon"], transformations)
     masks.show()
-    masks.print_names()
+    # masks.print_names()
+
+    stim = StimManager(mask_manager=masks, led_driver=led)
+    stim.show()
 
     # connect signals and slots
     dmd_mask.DMD_update.connect(dmd_widget.update_image)
     masks.mask_expose.connect(dmd_mask.expose)
+    stim.mask_expose.connect(dmd_mask.expose)
     masks.clear_dmd.connect(dmd_mask.clear)
     camera_controls.image_ready.connect(cam_mask.set_image)
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
