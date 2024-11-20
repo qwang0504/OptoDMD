@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Optional, List
 from image_tools import im2uint8, im2rgb, DrawPolyMask
-from qt_widgets import LabeledSpinBox
+
 
 class DrawPolyMaskOpto(QWidget):
     """
@@ -270,6 +270,7 @@ class MaskManager(QWidget):
         self.mask_drawers = mask_drawers
         self.mask_drawer_names = mask_drawer_names
         self.transformations = transformations 
+        
         self.create_components()
         self.layout_components()
 
@@ -306,8 +307,7 @@ class MaskManager(QWidget):
         self.clear_dmd_button.setText('clear DMD')
         self.clear_dmd_button.clicked.connect(self.clear_dmd)
 
-
-    def layout_components(self):
+    def layout_components(self): 
 
         mask_buttons_layout = QHBoxLayout()
         mask_buttons_layout.addWidget(self.clear)
@@ -413,4 +413,3 @@ class MaskManager(QWidget):
             widget.maskExpose.connect(self.on_mask_expose)
             self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
             self.mask_widgets[1] = widget
-

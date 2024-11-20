@@ -259,7 +259,7 @@ class CameraControl(QWidget):
         self.fourcc_input.editingFinished.connect(self.set_fourcc)
 
         self.image_label = QLabel()
-        
+
         # controls 
         for c in self.controls:
             self.create_spinbox(c)
@@ -357,7 +357,6 @@ class CameraControl(QWidget):
     def update_image(self, image: np.ndarray):
         self.image_label.setPixmap(NDarray_to_QPixmap(image))
         
-
 
 class CameraControlRecording(QWidget):
     
