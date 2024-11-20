@@ -62,7 +62,7 @@ dmd_mask = DrawPolyMaskOptoDMD(dmd_drawer)
 twop_mask = DrawPolyMaskOpto(twop_drawer)
 
 masks = MaskManager([cam_mask, dmd_mask, twop_mask], ["Camera", "DMD", "Two Photon"], transformations)
-# masks.show()
+masks.show()
 
 stim = StimManager(mask_manager=masks, led_driver=led)
 stim.show()
