@@ -88,6 +88,7 @@ if __name__ == "__main__":
     masks.mask_expose.connect(dmd_mask.expose)
     stim.mask_expose.connect(dmd_mask.expose)
     masks.clear_dmd.connect(dmd_mask.clear)
+    stim.clear_dmd.connect(dmd_mask.clear)
     # camera_controls.image_ready.connect(cam_mask.set_image)
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
 
