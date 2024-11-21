@@ -1,4 +1,4 @@
-from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot
+from PyQt5.QtCore import pyqtSignal, Qt, QRunnable, QThreadPool, pyqtSlot
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScrollArea, QPushButton, QFrame, QLineEdit, QCheckBox, QListWidget
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox, LabeledSliderSpinBox
 from DrawMasks import MaskManager
@@ -11,11 +11,11 @@ import numpy as np
 class StimManager(QWidget):
 
     mask_expose = pyqtSignal(int)
+    clear_dmd = pyqtSignal()
     
     def __init__(
             self,
             mask_manager : MaskManager,
-            # daio: DigitalAnalogIO, 
             led_driver: LEDDriver,
             *args, **kwargs
             ):
@@ -23,25 +23,25 @@ class StimManager(QWidget):
         super().__init__(*args, **kwargs)
 
         self.mask_manager = mask_manager
-        self.mask_widgets = self.mask_manager.mask_widgets
-        # self.mask_widgets_checked = {}
-        # self.daio = daio
-        self.led_driver = led_driver
-        # self.mask_keys = list(self.mask_widgets.keys())
-        # self.shuffled_mask_keys = None
-        self.mask_manager.draw_complete.connect(self.update_mask_display)
 
-        # self.get_checked_masks()
+        self.led_driver = led_driver
+        self.mask_manager.draw_complete.connect(self.update_draw_display)
+        self.thread_pool = QThreadPool()
+
         self.create_components()
         self.layout_components()
     
-    def update_mask_display(self, signal: int):
+    def update_draw_display(self, signal: int):
         print(signal)
+        self.shuffled_mask_keys = None
+        self.mask_widgets = self.mask_manager.mask_widgets
         self.mask_keys = list(self.mask_widgets.keys())
-        mask_keys_str = [str(key) for key in self.mask_keys]
+        self.mask_names = [self.mask_widgets[key].name for key in self.mask_keys] 
+        mask_names_display = [str(key) + ': ' + self.mask_widgets[key].name for key in self.mask_keys] 
+        # mask_keys_str = [str(key) for key in self.mask_keys]
         if signal: 
             self.masks_display.clear()
-            self.masks_display.addItems(mask_keys_str)
+            self.masks_display.addItems(mask_names_display)
         else: 
             self.masks_display.clear()
     
@@ -85,17 +85,10 @@ class StimManager(QWidget):
 
         self.start_stim_button = QPushButton(self)
         self.start_stim_button.setText('Start stimulation')
-        self.start_stim_button.clicked.connect(self.start_stim)
+        self.start_stim_button.clicked.connect(self.start)
 
-        # list display showing the shuffled masks order 
         self.masks_display = QListWidget(self)
-        # self.shuffled_masks_display.addItems(self)
-        # self.shuffled_masks_names = []
-        # if self.shuffled_mask_keys is not None:
-        #     for key in self.shuffled_mask_keys:
-        #         self.shuffled_masks_names.append(self.mask_widgets[key].name)
-        # self.shuffled_masks_display.addItems(self.shuffled_masks_names)
-        
+
 
     def layout_components(self):
         
@@ -125,18 +118,6 @@ class StimManager(QWidget):
 
         layout_overall.addLayout(layout_controls)
         
-    # shuffling with or without identical consecutive elements?
-    # def randomise(self, masks, reps):
-    #     #some code
-    #     mask_copy = masks.copy()
-    #     np.random.shuffle(mask_copy)
-
-    #     while True:
-    #         np.random.shuffle(lst)
-    #         # Check for consecutive duplicates
-    #         if all(lst[i] != lst[i + 1] for i in range(len(lst) - 1)):
-    #             return lst
-
 
     # Callbacks
     def set_intensity(self, value: int):
@@ -158,8 +139,13 @@ class StimManager(QWidget):
                 np.random.shuffle(mask_keys_copy) 
             self.shuffled_mask_keys = mask_keys_copy
             print(self.shuffled_mask_keys)
-            shuffed_mask_keys_str = [str(key) for key in self.shuffled_mask_keys]
-            self.update_shuffle_display(shuffed_mask_keys_str)
+            self.shuffled_mask_names = [self.mask_widgets[key].name 
+                                        for key in self.shuffled_mask_keys]
+            shuffled_mask_names_display = [str(key) + ': ' + self.mask_widgets[key].name 
+                                           for key in self.shuffled_mask_keys] 
+            
+            # shuffed_mask_keys_str = [str(key) for key in self.shuffled_mask_keys]
+            self.update_shuffle_display(shuffled_mask_names_display)
         else:
             print('No masks drawn!')
         # return self.shuffled_mask_list
@@ -175,11 +161,39 @@ class StimManager(QWidget):
         if self.masks_display.count() > 0:
             self.masks_display.clear()
             self.masks_display.addItems(shuffled)
+
+    def start(self):
+        start_stim = StartStim(stim_manager=self, 
+                               led_driver=self.led_driver) #insert parameters
+        self.thread_pool.start(start_stim)
+
+
+class StartStim(QRunnable):
+    
+    def __init__(self, 
+                 stim_manager: StimManager, 
+                 led_driver: LEDDriver, 
+                 *args, **kwargs):
         
-    def start_stim(self):
-        for key in self.shuffled_mask_keys:
-            self.mask_expose.emit(key)
-            print('Mask ' + self.mask_widgets[key].name + ' exposed')
-            time.sleep(5)
-            self.led_driver.pulse(duration_ms=self.duration_spinbox.value())
-            time.sleep(self.interval_spinbox.value())
+        super().__init__(*args, **kwargs)
+
+        self.stim_manager = stim_manager
+        self.led_driver = led_driver
+
+    def run(self):
+        if self.stim_manager.shuffled_mask_keys:
+            for key in self.stim_manager.shuffled_mask_keys:
+                # self.clear_dmd.emit()
+                self.stim_manager.mask_expose.emit(key)
+                print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
+                time.sleep(2)
+                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
+                time.sleep(self.stim_manager.interval_spinbox.value())
+        else: 
+             for key in self.stim_manager.mask_keys:
+                # self.clear_dmd.emit()
+                self.stim_manager.mask_expose.emit(key)
+                print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
+                time.sleep(2)
+                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
+                time.sleep(self.stim_manager.interval_spinbox.value())
