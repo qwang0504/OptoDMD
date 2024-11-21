@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 import numpy as np
 from qt_widgets import NDarray_to_QPixmap
 from image_tools import im2rgb, im2uint8
+import cv2
 
 class DMD(QWidget):
 
@@ -40,6 +41,10 @@ class DMD(QWidget):
 
     @pyqtSlot(np.ndarray)
     def update_image(self, image: NDArray=None):
+        # cv2.imshow('debug', image)
+        # cv2.waitKey(0)
+        # print('clicked')
+
         image = im2rgb(im2uint8(image))
         self.img_label.setPixmap(NDarray_to_QPixmap(image))     
 
