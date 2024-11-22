@@ -4,7 +4,8 @@ from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
 from camera_tools import XimeaCamera, CameraControl
-from camera_tools import CameraControl, OpenCV_Webcam
+# from camera_tools import CameraControl, OpenCV_Webcam
+from camera_widgets_new import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
@@ -54,9 +55,9 @@ if __name__ == "__main__":
     thread_pool.start(twop_sender)
 
     # Camera 
-    # cam = XimeaCamera(0)
-    # camera_controls = CameraControl(cam)
-    # camera_controls.show()
+    cam = XimeaCamera(0)
+    camera_controls = CameraControl(cam)
+    camera_controls.show()
 
     # Control LEDs
     daio = LabJackU3LV_new()

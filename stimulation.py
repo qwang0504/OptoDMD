@@ -186,7 +186,7 @@ class StartStim(QRunnable):
                 # self.clear_dmd.emit()
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                time.sleep(2)
+                time.sleep(1)
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.interval_spinbox.value())
         else: 
@@ -194,6 +194,9 @@ class StartStim(QRunnable):
                 # self.clear_dmd.emit()
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                time.sleep(2)
+                time.sleep(1)
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.interval_spinbox.value())
+
+# stim logger 
+# to save: idx and name of mask exposed, time of exposure, time of appearance on screen, duration, fish_id 

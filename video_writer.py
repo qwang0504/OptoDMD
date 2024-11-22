@@ -31,20 +31,23 @@ class OpenCV_VideoWriter(VideoWriter):
         self.filename = filename
         self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
         self.color = True
-        # self.writer = cv2.VideoWriter(filename, self.fourcc, fps, (width, height), color)
-        self.writer = None
+        # self.write_file = cv2.VideoWriter(filename, self.fourcc, fps, (width, height), color)
+        self.write_file = None
 
-    def start_writing(self, ready):
-        if ready:
-            self.writer = cv2.VideoWriter(self.filename, self.fourcc, self.fps, (self.width, self.height), self.color)
+    # def start_writing(self, ready):
+    #     if ready:
+    #         self.writer = cv2.VideoWriter(self.filename, self.fourcc, self.fps, (self.width, self.height), self.color)
 
     def write_frame(self, image: NDArray) -> None:
         if len(image.shape) == 2:
             image = np.dstack((image,image,image))
-        self.writer.write(image)
+        self.write_file.write(image)
 
     def close(self) -> None:
-        self.writer.release()
+        self.write_file.release()
+
+
+
 
 # video writer ffmpeg
 class FFMPEG_VideoWriter(VideoWriter):
