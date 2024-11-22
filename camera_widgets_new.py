@@ -7,6 +7,7 @@ from camera_tools import Camera, Frame
 import numpy as np
 from video_writer import OpenCV_VideoWriter
 import cv2 
+import time
 
 # TODO show camera FPS, display FPS, and camera statistics in status bar
 # TODO subclass CameraWidget for camera with specifi controls
@@ -95,6 +96,7 @@ class FrameSenderCombined(QRunnable):
             #     frame = self.camera.get_frame()
             #     self.signal.image_ready.emit(frame.image)
             if self.record_started:
+                # print(time.time())
                 frame = self.camera.get_frame()
                 if frame.image is not None:
                     self.writer.write_frame(frame.image)
@@ -318,6 +320,7 @@ class CameraControl(QWidget):
             self.sender.start_recording()
             self.record_button.setEnabled(False)
             self.record_started = True
+            print(time.time())
 
     def stop_recording(self):
         if self.record_started:
