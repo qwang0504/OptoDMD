@@ -72,19 +72,23 @@ class FrameSenderCombined(QRunnable):
                                                  fps=self.fps, 
                                                  frameSize=(self.width, self.height), 
                                                  isColor=self.writer.color)
+        # time.sleep(1)
         self.record_started = True
     
     def stop_recording(self):
         self.writer.close()
         self.record_started = False
+        time.sleep(1)
         self.camera.stop_acquisition()
 
     def start_acquisition(self):
         self.camera.start_acquisition()
+        time.sleep(1)
         self.acquisition_started = True
 
     def stop_acquisition(self):
         self.acquisition_started = False
+        time.sleep(1)
         self.camera.stop_acquisition()
 
     def terminate(self):
@@ -115,6 +119,9 @@ class FrameSenderCombined(QRunnable):
                     self.frame = frame.image
                     self.writer.write_frame(frame.image)
                     self.signal.image_ready.emit(True)
+
+            # print(self.acquisition_started)
+            # print(self.record_started)
                 # else:
                 #     self.signal.image_ready.emit(False)
             # self.writer.close()
