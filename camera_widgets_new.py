@@ -14,6 +14,9 @@ import time
 
 class FrameSignal(QObject):
     image_ready = pyqtSignal(np.ndarray)
+
+class FrameSignalBool(QObject):
+    image_ready = pyqtSignal(int)
     
 # TODO do the same using a MP_Queue/RingBuffer/ZMQ instead
 class FrameSender(QRunnable):
@@ -55,12 +58,15 @@ class FrameSenderCombined(QRunnable):
         self.height = int(self.camera.get_height())
         self.writer = OpenCV_VideoWriter(height=self.height, 
                                          width=self.width)
-        self.signal = FrameSignal()
+        self.signal = FrameSignalBool()
         self.acquisition_started = False
         self.record_started = False
         self.keepgoing = True
 
+        # self.signal.connect()
+
     def start_recording(self):
+        self.camera.start_acquisition()
         self.writer.write_file = cv2.VideoWriter(filename=self.filename, 
                                                  fourcc=self.fourcc, 
                                                  fps=self.fps, 
@@ -69,14 +75,17 @@ class FrameSenderCombined(QRunnable):
         self.record_started = True
     
     def stop_recording(self):
-        self.record_started = False
         self.writer.close()
+        self.record_started = False
+        self.camera.stop_acquisition()
 
     def start_acquisition(self):
+        self.camera.start_acquisition()
         self.acquisition_started = True
 
     def stop_acquisition(self):
         self.acquisition_started = False
+        self.camera.stop_acquisition()
 
     def terminate(self):
         self.keepgoing = False
@@ -92,14 +101,22 @@ class FrameSenderCombined(QRunnable):
 
     def run(self):
         while self.keepgoing:
-            # if self.acquisition_started: 
-            #     frame = self.camera.get_frame()
-            #     self.signal.image_ready.emit(frame.image)
+            if self.acquisition_started: 
+                frame = self.camera.get_frame()
+                if frame.image is not None: 
+                    self.frame = frame.image 
+                    self.signal.image_ready.emit(True)
+                # else:
+                #     self.signal.image_ready.emit(False)
             if self.record_started:
                 # print(time.time())
                 frame = self.camera.get_frame()
                 if frame.image is not None:
+                    self.frame = frame.image
                     self.writer.write_frame(frame.image)
+                    self.signal.image_ready.emit(True)
+                # else:
+                #     self.signal.image_ready.emit(False)
             # self.writer.close()
             
 # w = OpenCV_VideoWriter(height=488, width = 648)
@@ -125,7 +142,10 @@ class CameraControl(QWidget):
 
         self.sender = FrameSenderCombined(camera)
         # this is breaking encapsulation a bit 
-        self.sender.signal.image_ready.connect(self.image_ready)
+        # self.sender.signal.image_ready.connect(self.image_ready)
+        
+        self.sender.signal.image_ready.connect(self.preview)
+
         self.fps_ready.connect(self.sender.set_fps)
         self.fourcc_ready.connect(self.sender.set_fourcc)
         self.filename_ready.connect(self.sender.set_filename)
@@ -243,6 +263,16 @@ class CameraControl(QWidget):
         else: 
             self.acquisition_status.setText('Not acquiring')
 
+        # self.show_preview_button = QPushButton(self)
+        # self.show_preview_button.setText('show preview')
+        # self.show_preview_button.clicked.connect(self.show_preview)
+
+        # self.hide_preview_button = QPushButton(self)
+        # self.hide_preview_button.setText('hide preview')
+        # self.hide_preview_button.clicked.connect(self.hide_preview)
+
+        self.camera_preview = QLabel(self)
+
 
         # controls 
         for c in self.controls:
@@ -272,6 +302,10 @@ class CameraControl(QWidget):
         layout_acquisition_status.addWidget(self.acquisition_status_label)
         layout_acquisition_status.addWidget(self.acquisition_status)
 
+        # layout_preview = QHBoxLayout()
+        # layout_preview.addWidget(self.show_preview_button)
+        # layout_preview.addWidget(self.hide_preview_button)
+
         layout_controls = QVBoxLayout(self)
         layout_controls.addStretch()
         layout_controls.addWidget(self.exposure_spinbox)
@@ -280,7 +314,9 @@ class CameraControl(QWidget):
         layout_controls.addWidget(self.file_name_input)
         layout_controls.addWidget(self.encoding_fps_input)
         layout_controls.addWidget(self.fourcc_input)
+        layout_controls.addWidget(self.camera_preview)
         layout_controls.addLayout(layout_start_stop)
+        # layout_controls.addLayout(layout_preview)
         layout_controls.addWidget(self.ROI_groupbox)
         layout_controls.addLayout(layout_acquisition_status)
         layout_controls.addStretch()
@@ -293,7 +329,7 @@ class CameraControl(QWidget):
 
     def start_acquisition(self):
         if not self.acquisition_started:
-            self.camera.start_acquisition()
+            # self.camera.start_acquisition()
             self.sender.start_acquisition()
             self.acquisition_status.setText('Acquiring')
             self.record_button.setEnabled(False)
@@ -303,7 +339,7 @@ class CameraControl(QWidget):
     def stop_acquisition(self):
         if self.acquisition_started:
             self.sender.stop_acquisition()
-            self.camera.stop_acquisition()
+            # self.camera.stop_acquisition()
             self.acquisition_status.setText('Not acquiring')
             self.record_button.setEnabled(True)
             self.stop_record_button.setEnabled(True)
@@ -314,10 +350,10 @@ class CameraControl(QWidget):
             print('parameters not filled in') 
             
         elif not self.acquisition_started:
+            # self.camera.start_acquisition()
+            self.sender.start_recording()
             self.start_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-            self.camera.start_acquisition()
-            self.sender.start_recording()
             self.record_button.setEnabled(False)
             self.record_started = True
             print(time.time())
@@ -325,7 +361,7 @@ class CameraControl(QWidget):
     def stop_recording(self):
         if self.record_started:
             self.sender.stop_recording()
-            self.camera.stop_acquisition()
+            # self.camera.stop_acquisition()
             self.record_button.setEnabled(True)
             self.start_button.setEnabled(True)
             self.stop_button.setEnabled(True)
@@ -374,6 +410,16 @@ class CameraControl(QWidget):
         fps = int(self.encoding_fps_input.text())
         self.fps_ready.emit(fps)
         # self.fps = int(self.encoding_fps_input.text())
+
+    # def show_preview(self):
+    #     self.sender.signal.image_ready.connect(self.preview)
+
+    # def hide_preview(self):
+    #     self.camera_preview = QLabel(self)
+
+    def preview(self, image_ready: int):
+        if image_ready:
+            self.camera_preview.setPixmap(NDarray_to_QPixmap(self.sender.frame))
     
     # def send_params(self):
     #     self.sender.set_params(filename = self.filename, 
