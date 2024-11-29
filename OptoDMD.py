@@ -9,6 +9,7 @@ from camera_widgets_new import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
+from metadata import Metadata
 
 import sys
 import numpy as np
@@ -84,14 +85,20 @@ if __name__ == "__main__":
     stim = StimManager(mask_manager=masks, led_driver=led)
     stim.show()
 
+    metadata = Metadata(stim_manager=stim, cam_controls=camera_controls)
+
     # connect signals and slots
     dmd_mask.DMD_update.connect(dmd_widget.update_image)
     masks.mask_expose.connect(dmd_mask.expose)
     stim.mask_expose.connect(dmd_mask.expose)
     masks.clear_dmd.connect(dmd_mask.clear)
     stim.clear_dmd.connect(dmd_mask.clear)
-    # camera_controls.image_ready.connect(cam_mask.set_image)
+    camera_controls.image_ready.connect(cam_mask.set_image)
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
+    stim.start_stim.run_finished.connect(camera_controls.finish_recording)
+    stim.start_stim.run_finished.connect(metadata.initialise_widget)
+
+    stim.start_stim.run_finished.connect(metadata.get_pulse_timing)
 
     app.exec()
 
