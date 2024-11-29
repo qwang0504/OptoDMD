@@ -21,9 +21,9 @@ class LEDDriver(Protocol):
 
 class PulseSender(QRunnable):
 
-    pulse_start = pyqtSignal()
-    pulse_end = pyqtSignal()
-    pulse_duration = pyqtSignal()
+    # pulse_start = pyqtSignal()
+    # pulse_end = pyqtSignal()
+    # pulse_duration = pyqtSignal()
 
     def __init__(
             self, 
@@ -115,9 +115,6 @@ class LEDD1B:
             self.pwm_frequency
             )
         self.thread_pool.start(self.pulse_sender)
-        self.pulse_sender.time_start
-        self.pulse_sender.time_end
-        self.pulse_sender.duration
 
 
 
