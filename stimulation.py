@@ -157,19 +157,28 @@ class StimManager(QWidget):
             if all(mask_list[i] != mask_list[i + 1] for i in range(len(mask_list) - 1)):
                 return mask_list
 
+    def set_number_of_elements(self):
+        if self.shuffled_mask_keys:
+            self.n_elements = len(self.shuffled_mask_keys)
+        else: 
+            self.n_elements = len(self.mask_keys)
+
     def update_shuffle_display(self, shuffled):
         if self.masks_display.count() > 0:
             self.masks_display.clear()
             self.masks_display.addItems(shuffled)
 
     def start(self):
-        start_stim = StartStim(stim_manager=self, 
+        self.set_number_of_elements()
+        self.start_stim = StartStim(stim_manager=self, 
                                led_driver=self.led_driver) #insert parameters
-        self.thread_pool.start(start_stim)
+        self.thread_pool.start(self.start_stim)
 
 
 class StartStim(QRunnable):
     
+    run_finished = pyqtSignal(int)
+
     def __init__(self, 
                  stim_manager: StimManager, 
                  led_driver: LEDDriver, 
@@ -180,15 +189,24 @@ class StartStim(QRunnable):
         self.stim_manager = stim_manager
         self.led_driver = led_driver
 
+        self.pulse_start = np.zeros(self.stim_manager.n_elements)
+        self.pulse_end = np.zeros(self.stim_manager.n_elements)
+        self.pulse_duration = np.zeros(self.stim_manager.n_elements)
+
     def run(self):
         if self.stim_manager.shuffled_mask_keys:
-            for key in self.stim_manager.shuffled_mask_keys:
+            for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
                 # self.clear_dmd.emit()
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
                 time.sleep(1) #time.sleep given because sending command for mask exposure takes time
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.interval_spinbox.value())
+
+                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
+                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
+                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+
         else: 
              for key in self.stim_manager.mask_keys:
                 # self.clear_dmd.emit()
@@ -197,6 +215,14 @@ class StartStim(QRunnable):
                 time.sleep(1)
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.interval_spinbox.value())
+
+                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
+                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
+                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+        
+        # additional 2s before automatically ending the recording 
+        time.sleep(2)
+        self.run_finished.emit(True)
 
 # stim logger 
 # to save: idx and name of mask exposed, time of exposure, time of appearance on screen, duration, fish_id 
