@@ -4,6 +4,7 @@ from stimulation import StimManager
 # from LED import LEDDriver
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QCalendarWidget, QFileDialog
 from PyQt5.QtCore import QDate
+from qt_widgets import LabeledSpinBox
 from camera_widgets_new import CameraControl
 import json
 from pathlib import Path
@@ -64,6 +65,13 @@ class Metadata(QWidget):
         self.condition_input.setText('Condition')
         self.condition_input.returnPressed.connect(self.set_condition)
 
+        self.led_power_input = LabeledSpinBox(self)
+        self.led_power_input.setText('LED dial')
+        self.led_power_input.setRange(1, 6)
+        self.led_power_input.setValue(6)
+        self.led_power_input.setSingleStep(0.5)
+        self.led_power_input.valueChanged.connect(self.get_led_params)
+
         # self.directory_button = QPushButton(self)
         # self.directory_button.setText('Select directory')
         # self.directory_button.clicked.connect(self.set_directory)
@@ -87,6 +95,7 @@ class Metadata(QWidget):
         layout.addWidget(self.fishline_input)
         
         layout.addWidget(self.condition_input)
+        layout.addWidget(self.led_power_input)
         layout.addWidget(self.export_metadata_button)
 
 
@@ -143,6 +152,11 @@ class Metadata(QWidget):
             print(self.pulse_start)
             print(self.pulse_end)
             print(self.pulse_duration)
+    
+    def get_led_params(self):
+        self.led_power = self.led_power_input.value()
+        self.pwm_frequency = self.stim_manager.led_driver.pwm_frequency
+        self.duty_cycle = self.stim_manager.led_driver.duty_cycle
         
     def get_directory(self):
         self.directory = self.cam_controls.sender.file_dir
@@ -167,12 +181,15 @@ class Metadata(QWidget):
             'video_start': self.video_start_time, 
             'interval': self.interval, 
             'mask_order': self.mask_order, 
+            'led_power': self.led_power, 
+            'pwm_frequency': self.pwm_frequency, 
+            'pwm_duty_cycle': self.duty_cycle,
             'pulse_start': list(self.pulse_start), 
             'pulse_end': list(self.pulse_end), 
             'pulse_duration': list(self.pulse_duration)
         }
 
-        metadata_path = Path(self.directory, self.id+'.json')
+        metadata_path = Path(self.directory, self.video_filename+'.json')
 
         with open(metadata_path, 'w') as file:
             json.dump(metadata_dict, file)
