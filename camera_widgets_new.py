@@ -2,7 +2,7 @@
 
 from PyQt5.QtCore import QTimer, pyqtSignal, QRunnable, QThreadPool, QObject
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QFileDialog
-from qt_widgets import LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, NDarray_to_QPixmap
+from qt_widgets import LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, NDarray_to_QPixmap
 from camera_tools import Camera, Frame
 import numpy as np
 from video_writer import OpenCV_VideoWriter
@@ -10,6 +10,7 @@ import cv2
 import time
 from pathlib import Path
 from datetime import datetime
+import os
 
 # TODO show camera FPS, display FPS, and camera statistics in status bar
 # TODO subclass CameraWidget for camera with specifi controls
@@ -69,16 +70,13 @@ class FrameSenderCombined(QRunnable):
 
     def start_recording(self):
         self.camera.start_acquisition()
-        self.writer.write_file = cv2.VideoWriter(filename=Path(self.file_dir, self.filename), 
+        self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.file_dir, self.filename)), 
                                                  fourcc=self.fourcc, 
                                                  fps=self.fps, 
                                                  frameSize=(self.width, self.height), 
                                                  isColor=self.writer.color)
         time.sleep(1)
         self.video_start_time = time.monotonic()
-        date_today = datetime.today()
-        self.date = date_today.strftime('%Y%m%d')
-        self.time_h_m = date_today.strftime('%H%M')
         self.record_started = True
     
     def stop_recording(self):
@@ -160,6 +158,7 @@ class CameraControl(QWidget):
         self.fps_ready.connect(self.sender.set_fps)
         self.fourcc_ready.connect(self.sender.set_fourcc)
         self.filename_ready.connect(self.sender.set_filename)
+        self.dir_ready.connect(self.sender.set_directory)
 
         self.thread_pool = QThreadPool()
         self.thread_pool.start(self.sender)
@@ -258,13 +257,22 @@ class CameraControl(QWidget):
         self.instructions.setText('please press Enter after input')
 
         self.directory_button = QPushButton(self)
-        self.directory_button.setSizePolicy(QPushButton.Fixed, QPushButton.Fixed)
         self.directory_button.setText('select directory')
         self.directory_button.clicked.connect(self.select_directory)
 
         self.directory_label = QLabel(self)
         self.directory_label.setText('directory selected: ')
-
+        
+        self.make_dir_button = QPushButton(self)
+        self.make_dir_button.setText('Create folder')
+        self.make_dir_button.clicked.connect(self.make_dir)
+                                             
+        self.fish_number_input = LabeledSpinBox(self)
+        self.fish_number_input.setText('Fish number')
+        self.fish_number_input.setRange(0, 999)
+        self.fish_number_input.setSingleStep(1)
+        self.fish_number_input.valueChanged.connect(self.set_fish_number)
+        
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('file_name.avi')
         self.file_name_input.returnPressed.connect(self.set_filename)
@@ -331,14 +339,24 @@ class CameraControl(QWidget):
         # layout_preview.addWidget(self.show_preview_button)
         # layout_preview.addWidget(self.hide_preview_button)
 
+        layout_dir = QVBoxLayout()
+        layout_dir.addWidget(self.directory_label)
+        layout_dir.addWidget(self.directory_button)
+
+        layout_files = QHBoxLayout()
+        layout_files.addLayout(layout_dir)
+        layout_files.addWidget(self.fish_number_input)
+        layout_files.addWidget(self.make_dir_button)
+
         layout_controls = QVBoxLayout(self)
         layout_controls.addStretch()
         layout_controls.addWidget(self.exposure_spinbox)
         layout_controls.addWidget(self.gain_spinbox)
         layout_controls.addWidget(self.framerate_spinbox)
         layout_controls.addWidget(self.instructions)
-        layout_controls.addWidget(self.directory_label)
-        layout_controls.addWidget(self.directory_button)
+
+        layout_controls.addLayout(layout_files)
+
         layout_controls.addWidget(self.file_name_input)
         layout_controls.addWidget(self.encoding_fps_input)
         layout_controls.addWidget(self.fourcc_input)
@@ -432,17 +450,20 @@ class CameraControl(QWidget):
 
     def set_filename(self):
         filename = self.file_name_input.text()
+        self.file_name_input.clearFocus()
         self.filename_ready.emit(filename)
         # self.sender.set_params(filename = self.file_name_input.text())
         # self.filename = self.file_name_input.text()
 
     def set_fourcc(self):
         fourcc = self.fourcc_input.text()
+        self.fourcc_input.clearFocus()
         self.fourcc_ready.emit(fourcc)
         # self.fourcc = self.fourcc_input.text()
 
     def set_fps(self):
         fps = int(self.encoding_fps_input.text())
+        self.encoding_fps_input.clearFocus()
         self.fps_ready.emit(fps)
         # self.fps = int(self.encoding_fps_input.text())
 
@@ -465,8 +486,24 @@ class CameraControl(QWidget):
         self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
         if self.directory:
             self.directory_label.setText(f"Selected Directory: {self.directory}")
-        self.dir_ready.emit(self.directory)
 
+
+    def make_dir(self):
+        date_today = datetime.today()
+        self.date = date_today.strftime('%Y%m%d')
+        self.time_h_m = date_today.strftime('%H%M')
+        if self.directory and self.fish_number:
+            self.fish_id = self.date + self.fish_number
+            self.fish_dir = Path(self.directory, self.fish_id)
+            try: 
+                self.fish_dir.mkdir()
+                self.dir_ready.emit(str(self.fish_dir))
+            except FileExistsError:
+                print(f'directory {self.fish_dir} already exists')
+
+    def set_fish_number(self):
+        fish_number = self.fish_number_input.value()
+        self.fish_number = f'{fish_number:03}' #adds leading zeros
 
 
 class CameraControl_MP(QWidget):
