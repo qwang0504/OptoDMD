@@ -4,10 +4,11 @@ from stimulation import StimManager
 # from LED import LEDDriver
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QCalendarWidget, QFileDialog
 from PyQt5.QtCore import QDate
-from qt_widgets import LabeledSpinBox
+from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox
 from camera_widgets_new import CameraControl
 import json
 from pathlib import Path
+from datetime import datetime
 
 class Metadata(QWidget):
     def __init__(
@@ -31,13 +32,14 @@ class Metadata(QWidget):
     def initialise_widget(self, signal: int):
         if signal: 
             self.show()
-            self.generate_id()
+            self.get_id()
             self.get_video_settings()
             self.get_interval()
             self.get_directory()
             self.get_mask_order()
             self.get_interval()
             self.get_pulse_timing()
+            self.get_led_params()
 
     def declare_components(self):
 
@@ -65,7 +67,7 @@ class Metadata(QWidget):
         self.condition_input.setText('Condition')
         self.condition_input.returnPressed.connect(self.set_condition)
 
-        self.led_power_input = LabeledSpinBox(self)
+        self.led_power_input = LabeledDoubleSpinBox(self)
         self.led_power_input.setText('LED dial')
         self.led_power_input.setRange(1, 6)
         self.led_power_input.setValue(6)
@@ -101,10 +103,9 @@ class Metadata(QWidget):
 
     # gets today's date and time and formats it into YYYYmmDDHHMM
     # creates unique id with fish number 
-    def generate_id(self):
-        date = self.cam_controls.sender.date
-        self.id = date + self.fish_number
-    
+    def get_id(self):
+        self.id = self.cam_controls.fish_id
+
     def set_fish_number(self):
         self.fish_number = self.fish_number_input.text()
     
@@ -122,8 +123,10 @@ class Metadata(QWidget):
         self.dob = dob.toString("yyyyMMdd")
         # Update the label with the selected date
         self.calendar_label.setText(f"Date of birth: {dob_str}")
+        self.today = datetime.today()
         today_qdate = QDate(self.today.year, self.today.month, self.today.day)
-        self.age = today_qdate.daysTo(dob)
+        # self.age = today_qdate.daysTo(dob)
+        self.age = dob.daysTo(today_qdate) - 1
         self.dpf_label.setText(f'Days post-fertilisation: {self.age}')
         print(self.age)
 
@@ -144,22 +147,21 @@ class Metadata(QWidget):
         if self.stim_manager.shuffled_mask_keys:
             self.mask_order = self.stim_manager.shuffled_mask_names
 
-    def get_pulse_timing(self, signal: int):
-        if signal: 
-            self.pulse_start = self.stim_manager.start_stim.pulse_start
-            self.pulse_end = self.stim_manager.start_stim.pulse_end
-            self.pulse_duration = self.stim_manager.start_stim.pulse_duration
-            print(self.pulse_start)
-            print(self.pulse_end)
-            print(self.pulse_duration)
+    def get_pulse_timing(self):
+        self.pulse_start = self.stim_manager.start_stim.pulse_start
+        self.pulse_end = self.stim_manager.start_stim.pulse_end
+        self.pulse_duration = self.stim_manager.start_stim.pulse_duration
+        print(self.pulse_start)
+        print(self.pulse_end)
+        print(self.pulse_duration)
     
     def get_led_params(self):
         self.led_power = self.led_power_input.value()
         self.pwm_frequency = self.stim_manager.led_driver.pwm_frequency
-        self.duty_cycle = self.stim_manager.led_driver.duty_cycle
+        self.duty_cycle = self.stim_manager.led_driver.intensity
         
     def get_directory(self):
-        self.directory = self.cam_controls.sender.file_dir
+        self.directory = self.cam_controls.fish_dir
         # self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
         # if self.directory: 
         #     self.directory_label.setText(f'Selected directory: {self.directory}')
