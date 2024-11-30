@@ -1,4 +1,4 @@
-from PyQt5.QtCore import pyqtSignal, Qt, QRunnable, QThreadPool, pyqtSlot
+from PyQt5.QtCore import pyqtSignal, Qt, QRunnable, QThreadPool, pyqtSlot, QObject
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScrollArea, QPushButton, QFrame, QLineEdit, QCheckBox, QListWidget
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox, LabeledSliderSpinBox
 from DrawMasks import MaskManager
@@ -12,6 +12,7 @@ class StimManager(QWidget):
 
     mask_expose = pyqtSignal(int)
     clear_dmd = pyqtSignal()
+    run_complete = pyqtSignal(int)
     
     def __init__(
             self,
@@ -175,9 +176,11 @@ class StimManager(QWidget):
         self.thread_pool.start(self.start_stim)
 
 
-class StartStim(QRunnable):
-    
+class FinishedSignal(QObject):
     run_finished = pyqtSignal(int)
+
+
+class StartStim(QRunnable):
 
     def __init__(self, 
                  stim_manager: StimManager, 
@@ -188,7 +191,9 @@ class StartStim(QRunnable):
 
         self.stim_manager = stim_manager
         self.led_driver = led_driver
-
+        self.finished_signal = FinishedSignal()
+        self.finished_signal.run_finished.connect(self.stim_manager.run_complete)
+        
         self.pulse_start = np.zeros(self.stim_manager.n_elements)
         self.pulse_end = np.zeros(self.stim_manager.n_elements)
         self.pulse_duration = np.zeros(self.stim_manager.n_elements)
@@ -222,7 +227,8 @@ class StartStim(QRunnable):
         
         # additional 2s before automatically ending the recording 
         time.sleep(2)
-        self.run_finished.emit(True)
+        
+        self.finished_signal.run_finished.emit(True)
 
 # stim logger 
 # to save: idx and name of mask exposed, time of exposure, time of appearance on screen, duration, fish_id 
