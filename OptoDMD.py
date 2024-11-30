@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
     try:
-        with open('calibration_4x/calibration.json', 'r') as f:
+        with open('calibration_3x/calibration.json', 'r') as f:
             calibration = json.load(f)
 
         # 0: cam, 1: dmd, 2: twop
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     daio = LabJackU3LV_new()
     led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
     led_widget = LEDWidget(led_drivers=[led])
-    led_widget.show()
+    # led_widget.show()
 
     # Control DMD
     dmd_widget = DMD(screen_num=SCREEN_DMD)
@@ -93,12 +93,11 @@ if __name__ == "__main__":
     stim.mask_expose.connect(dmd_mask.expose)
     masks.clear_dmd.connect(dmd_mask.clear)
     stim.clear_dmd.connect(dmd_mask.clear)
-    camera_controls.image_ready.connect(cam_mask.set_image)
+    # camera_controls.image_ready.connect(cam_mask.set_image)
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
-    stim.start_stim.run_finished.connect(camera_controls.finish_recording)
-    stim.start_stim.run_finished.connect(metadata.initialise_widget)
-
-    stim.start_stim.run_finished.connect(metadata.get_pulse_timing)
+    stim.run_complete.connect(camera_controls.finish_recording)
+    stim.run_complete.connect(metadata.initialise_widget)
+    stim.run_complete.connect(metadata.get_pulse_timing)
 
     app.exec()
 
