@@ -20,8 +20,11 @@ if __name__ == "__main__":
 
     # zmq settings
     PROTOCOL = "tcp://"
-    HOST = "o1-317"
-    PORT = 5556
+    SCANIMAGE_HOST = "o1-317"
+    STIM_HOST = "o1-609"
+    SCANIMAGE_PORT = 5556
+    STIM_PORT = 5557
+    CAM_PORT = 5558
     
     # dmd settings
     SCREEN_DMD = 1
@@ -50,7 +53,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Communication with ScanImage
-    scan_image = ScanImage(PROTOCOL, HOST, PORT)
+    scan_image = ScanImage(PROTOCOL, SCANIMAGE_HOST, SCANIMAGE_PORT)
     twop_sender = ImageSender(scan_image)
     thread_pool = QThreadPool()
     thread_pool.start(twop_sender)
