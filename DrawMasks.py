@@ -1,11 +1,11 @@
 import cv2
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScrollArea, QPushButton, QFrame, QLineEdit, QCheckBox
 import numpy as np
 from numpy.typing import NDArray
 from typing import Optional, List
 from image_tools import im2uint8, im2rgb, DrawPolyMask
-from qt_widgets import LabeledSpinBox
+
 
 class DrawPolyMaskOpto(QWidget):
     """
@@ -13,7 +13,7 @@ class DrawPolyMaskOpto(QWidget):
     or hide masks
     """
 
-    mask_drawn = pyqtSignal(int, int, np.ndarray)
+    mask_drawn = pyqtSignal(int, int, np.ndarray) #ID, Bool, mask_gray?
 
     def __init__(self, drawer: DrawPolyMask, *args, **kwargs):
     
@@ -189,6 +189,7 @@ class MaskItem(QWidget):
     showClicked = pyqtSignal(int,int)
     deletePressed = pyqtSignal(int)
     maskExpose = pyqtSignal(int)
+    nameChange = pyqtSignal(int, str)
 
     def __init__(self, mask_index: int, name: Optional[str] = "name", *args, **kwargs):
 
@@ -230,6 +231,7 @@ class MaskItem(QWidget):
     
     def change_name(self):
         self.name = self.name_label.text()
+        self.nameChange.emit(self.mask_index, self.name)
 
     def show_clicked(self):
         visible = (self.show.checkState() == Qt.Checked)
@@ -250,6 +252,7 @@ class MaskManager(QWidget):
     mask_visibility = pyqtSignal(int, int)
     mask_expose = pyqtSignal(int)
     clear_dmd = pyqtSignal()
+    draw_complete = pyqtSignal(int)
 
     def __init__(
         self,
@@ -268,6 +271,7 @@ class MaskManager(QWidget):
         self.mask_drawers = mask_drawers
         self.mask_drawer_names = mask_drawer_names
         self.transformations = transformations 
+        
         self.create_components()
         self.layout_components()
 
@@ -304,8 +308,11 @@ class MaskManager(QWidget):
         self.clear_dmd_button.setText('clear DMD')
         self.clear_dmd_button.clicked.connect(self.clear_dmd)
 
+        self.draw_complete_button = QPushButton(self)
+        self.draw_complete_button.setText('Drawing complete')
+        self.draw_complete_button.clicked.connect(self.drawing_complete)
 
-    def layout_components(self):
+    def layout_components(self): 
 
         mask_buttons_layout = QHBoxLayout()
         mask_buttons_layout.addWidget(self.clear)
@@ -320,6 +327,7 @@ class MaskManager(QWidget):
         mask_controls.addLayout(mask_buttons_layout)
         mask_controls.addWidget(self.scroll_area)
         mask_controls.addWidget(self.clear_dmd_button)
+        mask_controls.addWidget(self.draw_complete_button)
 
         tabs = QTabWidget()
         for drawer, name in zip(self.mask_drawers, self.mask_drawer_names):
@@ -350,6 +358,19 @@ class MaskManager(QWidget):
         widget.maskExpose.connect(self.on_mask_expose)
         self.mask_widgets[key] = widget
         self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
+
+        #test code that uses signals and slots to print the name change signal 
+        #self.mask_widgets[key].nameChange.connect(self.print_names_signal)  
+ 
+    #test method to print modified mask names 
+    def print_names(self):
+        keys = self.mask_widgets.keys()
+        for key in keys:
+            if str(key) != self.mask_widgets[key].name:
+                print(f'name changed from {key} to {self.mask_widgets[key].name}')
+
+    def print_names_signal(self, key: int, name: str):
+        print(f'name changed from {key} to {self.mask_widgets[key].name}')
 
     def on_delete_mask(self, key: int):
 
@@ -400,3 +421,8 @@ class MaskManager(QWidget):
             self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
             self.mask_widgets[1] = widget
 
+    def drawing_complete(self):
+        if self.mask_widgets:
+            self.draw_complete.emit(True)
+        else: 
+            self.draw_complete.emit(False)

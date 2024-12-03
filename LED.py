@@ -1,6 +1,6 @@
 from daq import DigitalAnalogIO
 import time
-from PyQt5.QtCore import QRunnable, QThreadPool
+from PyQt5.QtCore import QRunnable, QThreadPool, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QWidget
 from qt_widgets import LabeledSliderSpinBox, LabeledSpinBox
 from typing import Protocol, List
@@ -21,6 +21,10 @@ class LEDDriver(Protocol):
 
 class PulseSender(QRunnable):
 
+    # pulse_start = pyqtSignal()
+    # pulse_end = pyqtSignal()
+    # pulse_duration = pyqtSignal()
+
     def __init__(
             self, 
             DAIO: DigitalAnalogIO, 
@@ -39,9 +43,17 @@ class PulseSender(QRunnable):
         self.pwm_frequency = pwm_frequency
 
     def run(self):
+        self.time_start = time.monotonic() 
+        
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=self.duty_cycle, frequency=self.pwm_frequency)
         time.sleep(self.pulse_duration_ms/1000.0)
+        
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=0, frequency=self.pwm_frequency)
+        self.time_end = time.monotonic()
+        print('start: ', self.time_start)
+        print('end: ', self.time_end)
+        self.duration = self.time_end - self.time_start
+        print('duration: ', self.duration)
 
 
 class LEDD1B:
@@ -59,7 +71,7 @@ class LEDD1B:
             self, 
             DAIO: DigitalAnalogIO, 
             pwm_frequency: float = 1000, 
-            pwm_channel: int = 5,
+            pwm_channel: int = 6,
             name: str = 'LED'
         ) -> None:
 
@@ -97,14 +109,15 @@ class LEDD1B:
         if self.started:
             raise RuntimeError('Already ON')
 
-        pulse_sender = PulseSender(
+        self.pulse_sender = PulseSender(
             self.DAIO, 
             duration_ms, 
             self.pwm_channel, 
             self.intensity, 
             self.pwm_frequency
-        )
-        self.thread_pool.start(pulse_sender)
+            )
+        self.thread_pool.start(self.pulse_sender)
+
 
 
 

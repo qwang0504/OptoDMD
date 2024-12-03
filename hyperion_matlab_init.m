@@ -1,9 +1,9 @@
 %scanimage_folder='C:\Program Files\Vidrio\SI-Premium_2020.1.2_(2021-02-09)_bd806fcff6';
-optoDMD_folder='C:\Users\martin.privat\Documents\OptoDMD';
-zeromq_jar_path = 'C:\Users\martin.privat\Documents\OptoDMD\jeromq-0.6.0.jar';
+optoDMD_folder='C:\Users\wangqing\Code\OptoDMD';
+zeromq_jar_path = 'C:\Users\wangqing\Code\OptoDMD\jeromq-0.6.0.jar';
 zeromq_protocol = "tcp://";
 zeromq_host = "*";
-zeromq_port = 5574;
+zeromq_port = 5558;
 channel = 1;
 
 % add scanimage path

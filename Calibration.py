@@ -39,7 +39,7 @@ def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
 
 if __name__ == "__main__":
 
-    CALIBRATE_CAMERA = False
+    CALIBRATE_CAMERA = True
     CALIBRATE_TWOPHOTON = False
     SCREEN_DMD = 1
     DMD_HEIGHT = 1140
@@ -97,7 +97,7 @@ if __name__ == "__main__":
         # communicate with scanimage
         PROTOCOL = "tcp://"
         HOST = "o1-317"
-        PORT = 5555
+        PORT = 5560
 
         print("""
         Put a slide with some structure under the microscope

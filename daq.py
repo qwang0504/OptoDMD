@@ -11,6 +11,7 @@
 import u3
 from pyfirmata import Arduino
 from typing import Protocol
+import time
 
 class DigitalAnalogIO(Protocol):
 
@@ -91,6 +92,7 @@ class LabJackU3LV:
     DAC1 = 5002
 
     # Digital Input/Output
+    # Registers correspond to DIO STATES (i.e. high=1, low=0)
     DIO0 = 6000
     DIO1 = 6001
     DIO2 = 6002
@@ -137,7 +139,7 @@ class LabJackU3LV:
         
         self.device = u3.U3()
 
-    def analogWrite(self, channel: int, val: float) -> None:
+    def analogWrite(self, channel: int, val: float) -> None: 
         self.device.writeRegister(self.NUM_TIMER_ENABLED, 0)
         self.device.writeRegister(self.channels['AnalogOutput'][channel], val)
 
@@ -147,9 +149,10 @@ class LabJackU3LV:
         return self.device.readRegister(self.channels['AnalogInput'][channel])
     
     def digitalWrite(self, channel: int, val: bool):
-        self.device.writeRegister(self.NUM_TIMER_ENABLED, 0)
+        self.device.writeRegister(self.NUM_TIMER_ENABLED, 0) #ensure no timer enabled first?
         self.device.writeRegister(self.FIO_ANALOG, 0) # set channel as digital
-        self.device.writeRegister(self.channels['DigitalInputOutput'][channel], val)
+        #writing state of channel --> defaults direction to output! 
+        self.device.writeRegister(self.channels['DigitalInputOutput'][channel], val) 
 
     def digitalRead(self, channel: int) -> float:
         self.device.writeRegister(self.NUM_TIMER_ENABLED, 0)
@@ -205,3 +208,167 @@ class LabJackU3LV:
 
     def close(self) -> None:
         self.device.close()
+
+
+class LabJackU3LV_new:
+
+    def __init__(self) -> None:
+        self.device = u3.U3()
+        self.clock_freq = 48
+
+    def digitalRead(self, channel: int) -> int:
+        self.device.configIO(NumberOfTimersEnabled=0)
+        #configure analog / digital with bitmask 
+        self.device.configIO(FIOAnalog=0) #all digital 
+        return self.device.getFeedback(u3.BitStateRead(channel))[0] #output is a list [1] or [0]
+
+    def digitalWrite(self, channel: int, state: bool): #high=1, low=0
+        self.device.configIO(NumberOfTimersEnabled=0)
+        #configure analog / digital with bitmask 
+        self.device.configIO(FIOAnalog=0) #all digital 
+        self.device.getFeedback(u3.BitStateWrite(channel, state)) #defaults all to output 
+
+    def analogRead(self, channel: int) -> float:
+        self.device.configIO(NumberOfTimersEnabled=0)        
+        self.device.configIO(FIOAnalog=2**channel) #convert channel to analog 
+        #check if this formula is right!! 
+        return self.device.getAIN(channel) #output is a float
+
+    def analogWrite(self, channel: int, val: float, bit: int):
+        self.device.configIO(NumberOfTimersEnabled=0)
+        if bit == 1: #8-bit = 1
+            if channel==0:
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 0, is16Bits = False)
+                self.device.getFeedback(u3.DAC0_8(Value=DAC_VALUE))
+            else:
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 1, is16Bits = False)
+                self.device.getFeedback(u3.DAC1_8(Value=DAC_VALUE))
+        elif bit == 0: #16-bit = 0
+            if channel==0:
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 0, is16Bits = True)
+                self.device.getFeedback(u3.DAC0_16(Value=DAC_VALUE))
+            else:
+                DAC_VALUE = self.device.voltageToDACBits(val, dacNumber = 1, is16Bits = True)
+                self.device.getFeedback(u3.DAC1_16(Value=DAC_VALUE))
+        #DAC channels! 0 or 1 for DAC0 or DAC1, bits for 8-bit or 16-bits 
+        # self.device.writeRegister(self.channels['AnalogOutput'][channel], val)
+
+    def pwm(self, channel: int, duty_cycle: float, frequency: float) -> None:
+        
+        if not (0 <= duty_cycle <= 1):
+            raise ValueError('duty_cycle should be between 0 and 1')
+
+        if frequency > 187_500:
+            raise ValueError('max frequency at 48MHz is 187_500 Hz')
+        elif frequency < 2.861:
+            raise ValueError('min frequency at 48MHz is 2.861 Hz')
+         
+        if frequency > 732.42:
+            timer_mode = 1 #8-bit = mode 1
+            div = 2**8
+        else:
+            timer_mode = 0 #16-bit = mode 0
+            div = 2**16
+
+        # make sure digital value is 0
+        self.digitalWrite(channel,0)
+        # why is this necessary? make sure that the channel isn't already sending a signal?
+
+        if duty_cycle == 0:
+            # PWM can't fully turn off. Use digital write instead
+            # and return
+            return
+        
+        # divisor should be in the range 0-255, 0 corresponds to a divisor of 256
+        timer_clock_divisor = int( (self.clock_freq * 1e6)/(frequency * div) ) #48 MHz / (frequency * divisor)
+        
+        if timer_clock_divisor == 256: 
+            timer_clock_divisor = 0 
+        
+        # enable Timer0, set pin offset
+        self.device.configIO(NumberOfTimersEnabled=1, TimerCounterPinOffset=channel)
+
+        # set the timer clock to 48 MHz with divisor (correspond to value of 6 with reference to section 2.9)
+        self.device.configTimerClock(TimerClockBase=6, TimerClockDivisor=timer_clock_divisor)
+
+        # 16-bit value for duty cycle
+        value = int(65535*(1-duty_cycle))
+
+        # Configure the timer for 16-bit PWM
+        time_start_pwm = time.time()
+        self.device.getFeedback(u3.TimerConfig(timer=0, TimerMode=timer_mode, Value=value))
+        print('start_pwm: ', time_start_pwm)
+
+    def close(self) -> None:
+        self.device.close()
+
+    
+
+    #digital direction (1 or 0)
+    #if output, high or low state (1 or 0)
+
+# import u3
+# import time
+# import numpy as np
+# d = u3.U3()
+# d.configIO()
+# d.configIO(FIOAnalog=0)
+
+# # d.configIO(NumberOfTimersEnabled=0, TimerCounterPinOffset=5)
+
+# d.configIO(NumberOfTimersEnabled=1, TimerCounterPinOffset=5)
+
+# # d.configIO(FIOAnalog=15)
+# d.configTimerClock(TimerClockBase=3, TimerClockDivisor=256)
+# d.getFeedback(u3.TimerConfig(timer = 0, TimerMode = 1, Value = 40000))
+
+# d.getFeedback(u3.BitStateRead(5))
+# d.getFeedback(u3.BitStateWrite(5, 0))
+# d.getFeedback(u3.Timer0Config(0, 40000))
+
+# #Timer modes
+# # 0 = 16-bit PWM
+# # 1 = 8-bit PWM
+# # refer to p. 24-25 / Section 2.9.1
+
+# #values passed indicate %time spent LOW
+# #48 MHz with divisors (ClockBase = 6)
+# #16-bit range: 2.861 - 732.42
+# #8-bit range: 732.422 - 187500
+
+
+# duration = 10
+# bits = []
+# start = time.time()
+# while time.time() < start + duration: 
+#     bits.append(d.getFeedback(u3.BitStateRead(5))[0])
+
+# sum([i==0 for i in bits ])/len(bits) 
+# 40000/65536
+
+# len(np.where(np.diff(bits) > 0)[0])/duration
+
+# d.getFeedback(u3.DAC0_16(30000))
+
+
+# DAC0_VALUE = d.voltageToDACBits(4, dacNumber = 0, is16Bits = False)
+# d.getFeedback(u3.DAC0_8(DAC0_VALUE))
+# #make AIN1 analog input 
+# channel=1
+# d.configIO(FIOAnalog=2**channel) 
+# ain0bits = d.getFeedback(u3.AIN(1))
+
+# d.getAIN(1)
+
+# import matplotlib.pyplot as plt
+
+# duration = 60
+# bits = []
+# start = time.time()
+# while time.time() < start + duration: 
+#     bits.append(d.getAIN(1))
+
+# plt.plot(bits)
+# plt.show()
+
+# plt.close()
