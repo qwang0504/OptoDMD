@@ -43,11 +43,13 @@ class PulseSender(QRunnable):
         self.pwm_frequency = pwm_frequency
 
     def run(self):
+        self.time_start = time.time()
+        
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=self.duty_cycle, frequency=self.pwm_frequency)
-        self.time_start = time.monotonic() 
         time.sleep(self.pulse_duration_ms/1000.0)
+        
         self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=0, frequency=self.pwm_frequency)
-        self.time_end = time.monotonic()
+        self.time_end = time.time()
         print('start: ', self.time_start)
         print('end: ', self.time_end)
         self.duration = self.time_end - self.time_start
