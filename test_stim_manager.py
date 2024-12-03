@@ -5,6 +5,8 @@ from DMD import DMD
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
+from camera_tools import XimeaCamera
+from camera_widgets_new import CameraControl
 
 import sys
 import numpy as np
@@ -14,7 +16,7 @@ import json
 
 PROTOCOL = "tcp://"
 HOST = "o1-317"
-PORT = 5555
+PORT = 5558
 
 # dmd settings
 SCREEN_DMD = 1
@@ -47,7 +49,12 @@ app = QApplication(sys.argv)
 daio = LabJackU3LV_new()
 led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
 led_widget = LEDWidget(led_drivers=[led])
-# led_widget.show()
+led_widget.show()
+
+# # Camera 
+# cam = XimeaCamera(0)
+# camera_controls = CameraControl(cam)
+# camera_controls.show()
 
 # Control DMD
 dmd_widget = DMD(screen_num=SCREEN_DMD)
