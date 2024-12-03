@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # zmq settings
     PROTOCOL = "tcp://"
     HOST = "o1-317"
-    PORT = 5555
+    PORT = 5556
     
     # dmd settings
     SCREEN_DMD = 1
