@@ -18,10 +18,17 @@ class StimManager(QWidget):
             self,
             mask_manager : MaskManager,
             led_driver: LEDDriver,
+            protocol: str, 
+            host: str, 
+            port: int, 
             *args, **kwargs
             ):
     
         super().__init__(*args, **kwargs)
+        
+        self.protocol = protocol
+        self.host = host
+        self.port = port
 
         self.mask_manager = mask_manager
 
