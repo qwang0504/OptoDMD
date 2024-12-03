@@ -102,7 +102,10 @@ class FrameSenderCombined(QRunnable):
         self.fps = fps
 
     def set_filename(self, filename: str):
-        self.filename = filename
+        video_name = filename+'.avi'
+        self.videoname = video_name
+        self.filename = filename 
+        self.output_dir = self.file_dir+'/'+self.filename
 
     def set_directory(self, file_dir: str):
         self.file_dir = file_dir
@@ -111,28 +114,30 @@ class FrameSenderCombined(QRunnable):
         self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
 
     def run(self):
+
         while self.keepgoing:
             if self.acquisition_started: 
                 frame = self.camera.get_frame()
                 if frame.image is not None: 
                     self.frame = frame.image 
                     self.signal.image_ready.emit(True)
-                # else:
-                #     self.signal.image_ready.emit(False)
+
             if self.record_started:
-                # print(time.time())
                 frame = self.camera.get_frame()
                 if frame.image is not None:
-                    self.frame = frame.image
+                    # self.frame = frame.image
                     self.writer.write_frame(frame.image)
-                    self.signal.image_ready.emit(True)
-
-            # print(self.acquisition_started)
-            # print(self.record_started)
-                # else:
-                #     self.signal.image_ready.emit(False)
-            # self.writer.close()
+                    # self.signal.image_ready.emit(True)
             
+            # if self.record_started:
+            #     frame = self.camera.get_frame()
+            #     if frame.image is not None:
+            #         # self.frame = frame.image
+            #         cv2.imwrite(self.output_dir + str(self.i) + '.tif', frame.image)
+            #         # self.signal.image_ready.emit(True)
+            #         self.i += 1
+            #         print(self.i)
+
 
 
 class CameraControl(QWidget):
@@ -486,6 +491,7 @@ class CameraControl(QWidget):
         self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
         if self.directory:
             self.directory_label.setText(f"Selected Directory: {self.directory}")
+            self.dir_ready.emit(str(self.directory))
 
 
     def make_dir(self):
