@@ -70,13 +70,13 @@ class FrameSenderCombined(QRunnable):
 
     def start_recording(self):
         self.camera.start_acquisition()
-        self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.file_dir, self.filename)), 
+        self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.file_dir, self.videoname)), 
                                                  fourcc=self.fourcc, 
                                                  fps=self.fps, 
                                                  frameSize=(self.width, self.height), 
                                                  isColor=self.writer.color)
         time.sleep(1)
-        self.video_start_time = time.monotonic()
+        self.video_start_time = time.time()
         self.record_started = True
         print(self.video_start_time)
     
