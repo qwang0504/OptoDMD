@@ -3,7 +3,7 @@ optoDMD_folder='C:\Users\wangqing\Code\OptoDMD';
 zeromq_jar_path = 'C:\Users\wangqing\Code\OptoDMD\jeromq-0.6.0.jar';
 zeromq_protocol = "tcp://";
 zeromq_host = "*";
-zeromq_port = 5558;
+zeromq_port = 5572;
 channel = 1;
 
 % add scanimage path
