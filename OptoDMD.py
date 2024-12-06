@@ -9,7 +9,7 @@ from camera_widgets_new import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
-from metadata import Metadata
+from metadata import StimMetadata
 
 import sys
 import numpy as np
@@ -20,9 +20,12 @@ if __name__ == "__main__":
 
     # zmq settings
     PROTOCOL = "tcp://"
-    HOST = "o1-317"
-    PORT = 5555
-    
+    SCANIMAGE_HOST = "o1-317"
+    # STIM_HOST = "o1-609"
+    SCANIMAGE_PORT = 5572
+    STIM_PORT = 5506
+    CAM_PORT = 5507
+
     # dmd settings
     SCREEN_DMD = 1
     DMD_HEIGHT = 1140
@@ -50,21 +53,21 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Communication with ScanImage
-    scan_image = ScanImage(PROTOCOL, HOST, PORT)
+    scan_image = ScanImage(PROTOCOL, SCANIMAGE_HOST, SCANIMAGE_PORT)
     twop_sender = ImageSender(scan_image)
     thread_pool = QThreadPool()
     thread_pool.start(twop_sender)
 
     # Camera 
-    cam = XimeaCamera(0)
-    camera_controls = CameraControl(cam)
-    camera_controls.show()
+    # cam = XimeaCamera(0)
+    # camera_controls = CameraControl(cam)
+    # camera_controls.show()
 
     # Control LEDs
     daio = LabJackU3LV_new()
     led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
     led_widget = LEDWidget(led_drivers=[led])
-    # led_widget.show()
+    led_widget.show()
 
     # Control DMD
     dmd_widget = DMD(screen_num=SCREEN_DMD)
@@ -82,10 +85,15 @@ if __name__ == "__main__":
     masks.show()
     # masks.print_names()
 
-    stim = StimManager(mask_manager=masks, led_driver=led)
+    stim = StimManager(mask_manager=masks, 
+                       led_driver=led, 
+                       protocol=PROTOCOL,
+                       cam_host=SCANIMAGE_HOST,
+                       stim_port=STIM_PORT)
     stim.show()
 
-    metadata = Metadata(stim_manager=stim, cam_controls=camera_controls)
+    # metadata = Metadata(stim_manager=stim, cam_controls=camera_controls)
+    stim_metadata = StimMetadata(stim_manager=stim)
 
     # connect signals and slots
     dmd_mask.DMD_update.connect(dmd_widget.update_image)
@@ -95,9 +103,8 @@ if __name__ == "__main__":
     stim.clear_dmd.connect(dmd_mask.clear)
     # camera_controls.image_ready.connect(cam_mask.set_image)
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
-    stim.run_complete.connect(camera_controls.finish_recording)
-    stim.run_complete.connect(metadata.initialise_widget)
-    stim.run_complete.connect(metadata.get_pulse_timing)
+    # stim.run_complete.connect(camera_controls.finish_recording)
+    stim.run_complete.connect(stim_metadata.initialise_widget)
 
     app.exec()
 
