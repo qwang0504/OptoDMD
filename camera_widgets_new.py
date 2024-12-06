@@ -1,6 +1,6 @@
 # TODO record to file ?
 
-from PyQt5.QtCore import QTimer, pyqtSignal, QRunnable, QThreadPool, QObject
+from PyQt5.QtCore import QTimer, pyqtSignal, pyqtSlot, QRunnable, QThreadPool, QObject
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QFileDialog
 from qt_widgets import LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, NDarray_to_QPixmap
 from camera_tools import Camera, Frame
@@ -11,9 +11,13 @@ import time
 from pathlib import Path
 from datetime import datetime
 import os
+import zmq
+import json
 
 # TODO show camera FPS, display FPS, and camera statistics in status bar
 # TODO subclass CameraWidget for camera with specifi controls
+
+
 
 class FrameSignal(QObject):
     image_ready = pyqtSignal(np.ndarray)
@@ -69,8 +73,14 @@ class FrameSenderCombined(QRunnable):
         # self.signal.connect()
 
     def start_recording(self):
-        self.camera.start_acquisition()
-        self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.file_dir, self.videoname)), 
+        self.camera.start_acquisition()        
+        # self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.file_dir, self.videoname)), 
+        #                                          fourcc=self.fourcc, 
+        #                                          fps=self.fps, 
+        #                                          frameSize=(self.width, self.height), 
+        #                                          isColor=self.writer.color)
+
+        self.writer.write_file = cv2.VideoWriter(filename=str(Path(self.stim_folder, self.filename + self.video_index + '.avi')), 
                                                  fourcc=self.fourcc, 
                                                  fps=self.fps, 
                                                  frameSize=(self.width, self.height), 
@@ -81,8 +91,8 @@ class FrameSenderCombined(QRunnable):
         print(self.video_start_time)
     
     def stop_recording(self):
-        self.writer.close()
         self.record_started = False
+        self.writer.close()
         time.sleep(1)
         self.camera.stop_acquisition()
 
@@ -103,10 +113,19 @@ class FrameSenderCombined(QRunnable):
         self.fps = fps
 
     def set_filename(self, filename: str):
-        video_name = filename+'.avi'
-        self.videoname = video_name
+        # video_name = filename + self.video_index+'.avi'
+        # self.videoname = video_name
         self.filename = filename 
-        self.output_dir = self.file_dir+'/'+self.filename
+        # self.output_dir = self.file_dir+'/'+self.filename
+
+    def set_video_index(self, index: str):
+        self.video_index = index
+
+    def set_stim_folder(self, stim_dir: str):
+        self.stim_folder = stim_dir
+
+    # def set_video_number(self, video_number: str):
+    #     self.video_number = video_number
 
     def set_directory(self, file_dir: str):
         self.file_dir = file_dir
@@ -115,8 +134,8 @@ class FrameSenderCombined(QRunnable):
         self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
 
     def run(self):
-        self.i = 0
-
+        # fd = open('timings_2.txt', 'w')
+        # self.i = 0
         while self.keepgoing:
             if self.acquisition_started: 
                 frame = self.camera.get_frame()
@@ -125,10 +144,10 @@ class FrameSenderCombined(QRunnable):
                     self.signal.image_ready.emit(True)
 
             if self.record_started:
-                
                 frame = self.camera.get_frame()
                 if frame.image is not None:
                     self.frame = frame.image
+                    # fd.write(f"{frame.index}, {frame.timestamp}\n")
                     self.writer.write_frame(frame.image)
                     self.signal.image_ready.emit(True)
             
@@ -140,6 +159,8 @@ class FrameSenderCombined(QRunnable):
             #         # self.signal.image_ready.emit(True)
             #         self.i += 1
             #         print(self.i)
+        
+        # fd.close()
 
 
 
@@ -150,14 +171,30 @@ class CameraControl(QWidget):
     fourcc_ready = pyqtSignal(str)
     filename_ready = pyqtSignal(str)
     dir_ready = pyqtSignal(str)
+    # video_number_ready = pyqtSignal(str)
+    recording_finished = pyqtSignal(int)
+    stim_dir_ready = pyqtSignal(str)
+    video_idx_ready = pyqtSignal(str)
+    
 
-    def __init__(self, camera: Camera, *args, **kwargs):
+    def __init__(self, 
+                 camera: Camera, 
+                 protocol: str, 
+                 stim_host: str, 
+                 stim_port: int,
+                #  cam_port: int, 
+                 *args, **kwargs):
 
         super().__init__(*args, **kwargs)
 
         self.camera = camera
 
         self.sender = FrameSenderCombined(camera)
+        self.message_receiver = MessageReceiver(cam_controls=self, 
+                                                protocol=protocol, 
+                                                stim_host=stim_host, 
+                                                stim_port=stim_port)
+        self.metadata = CameraMetadata(cam_controls=self)
         # this is breaking encapsulation a bit 
         # self.sender.signal.image_ready.connect(self.image_ready)
         
@@ -167,9 +204,14 @@ class CameraControl(QWidget):
         self.fourcc_ready.connect(self.sender.set_fourcc)
         self.filename_ready.connect(self.sender.set_filename)
         self.dir_ready.connect(self.sender.set_directory)
+        self.stim_dir_ready.connect(self.sender.set_stim_folder)
+        self.video_idx_ready.connect(self.sender.set_video_index)
 
         self.thread_pool = QThreadPool()
         self.thread_pool.start(self.sender)
+
+        self.message_threadpool = QThreadPool()
+        self.message_threadpool.start(self.message_receiver)
 
         self.acquisition_started = False
         self.record_started = False 
@@ -186,6 +228,10 @@ class CameraControl(QWidget):
         
         self.declare_components()
         self.layout_components()
+
+        # self.context = zmq.Context()
+        # self.start_socket = self.context.socket(zmq.PUB)
+        # self.start_socket.bind(protocol + "*:" +str(cam_port))
 
     # UI ---------------------------------------------------------
     
@@ -271,15 +317,27 @@ class CameraControl(QWidget):
         self.directory_label = QLabel(self)
         self.directory_label.setText('directory selected: ')
         
-        self.make_dir_button = QPushButton(self)
-        self.make_dir_button.setText('Create folder')
-        self.make_dir_button.clicked.connect(self.make_dir)
+        # self.make_dir_button = QPushButton(self)
+        # self.make_dir_button.setText('Create folder')
+        # self.make_dir_button.clicked.connect(self.make_dir)
                                              
         self.fish_number_input = LabeledSpinBox(self)
         self.fish_number_input.setText('Fish number')
         self.fish_number_input.setRange(0, 999)
         self.fish_number_input.setSingleStep(1)
         self.fish_number_input.valueChanged.connect(self.set_fish_number)
+
+        self.stimulation_number_input = LabeledSpinBox(self)
+        self.stimulation_number_input.setText('Stimulation number')
+        self.stimulation_number_input.setRange(0, 999)
+        self.stimulation_number_input.setSingleStep(1)
+        self.stimulation_number_input.valueChanged.connect(self.set_stim_number)
+
+        # self.video_number_input = LabeledSpinBox(self)
+        # self.video_number_input.setText('Video number')
+        # self.video_number_input.setRange(0, 999)
+        # self.video_number_input.setSingleStep(1)
+        # self.video_number_input.valueChanged.connect(self.set_video_number)
         
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('file_name.avi')
@@ -301,19 +359,7 @@ class CameraControl(QWidget):
         else: 
             self.acquisition_status.setText('Not acquiring')
 
-        # self.show_preview_button = QPushButton(self)
-        # self.show_preview_button.setText('show preview')
-        # self.show_preview_button.clicked.connect(self.show_preview)
-
-        # self.hide_preview_button = QPushButton(self)
-        # self.hide_preview_button.setText('hide preview')
-        # self.hide_preview_button.clicked.connect(self.hide_preview)
-
         self.camera_preview = QLabel(self)
-
-        # self.enter_metadata_button = QPushButton(self)
-        # self.enter_metadata_button.setText('enter metadata')
-        # self.enter_metadata_button.clicked.connect(self.enter_metadata)
 
         # controls 
         for c in self.controls:
@@ -343,37 +389,32 @@ class CameraControl(QWidget):
         layout_acquisition_status.addWidget(self.acquisition_status_label)
         layout_acquisition_status.addWidget(self.acquisition_status)
 
-        # layout_preview = QHBoxLayout()
-        # layout_preview.addWidget(self.show_preview_button)
-        # layout_preview.addWidget(self.hide_preview_button)
-
         layout_dir = QVBoxLayout()
         layout_dir.addWidget(self.directory_label)
         layout_dir.addWidget(self.directory_button)
 
         layout_files = QHBoxLayout()
-        layout_files.addLayout(layout_dir)
         layout_files.addWidget(self.fish_number_input)
-        layout_files.addWidget(self.make_dir_button)
+        layout_files.addWidget(self.stimulation_number_input)
+        layout_files.addLayout(layout_dir)
+        # layout_files.addWidget(self.make_dir_button)
 
         layout_controls = QVBoxLayout(self)
         layout_controls.addStretch()
+        layout_controls.addWidget(self.framerate_spinbox)
         layout_controls.addWidget(self.exposure_spinbox)
         layout_controls.addWidget(self.gain_spinbox)
-        layout_controls.addWidget(self.framerate_spinbox)
-        layout_controls.addWidget(self.instructions)
 
         layout_controls.addLayout(layout_files)
 
+        layout_controls.addWidget(self.instructions)
         layout_controls.addWidget(self.file_name_input)
         layout_controls.addWidget(self.encoding_fps_input)
         layout_controls.addWidget(self.fourcc_input)
         layout_controls.addWidget(self.camera_preview)
         layout_controls.addLayout(layout_start_stop)
-        # layout_controls.addLayout(layout_preview)
         layout_controls.addWidget(self.ROI_groupbox)
         layout_controls.addLayout(layout_acquisition_status)
-        # layout_controls.addWidget(self.enter_metadata_button)
         layout_controls.addStretch()
 
     # Callbacks --------------------------------------------------------- 
@@ -401,16 +442,15 @@ class CameraControl(QWidget):
             self.acquisition_started = False
     
     def start_recording(self):
-        if not (self.file_name_input.text().strip() or self.fourcc_input.text().strip() or self.encoding_fps_input.text().strip()):
-            print('parameters not filled in') 
-            
-        elif not self.acquisition_started:
-
+        # if not (self.file_name_input.text().strip() or self.fourcc_input.text().strip() or self.encoding_fps_input.text().strip()):
+        #     print('parameters not filled in') 
+        if not self.acquisition_started:
             self.sender.start_recording()
             self.start_button.setEnabled(False)
             self.stop_button.setEnabled(False)
             self.record_button.setEnabled(False)
             self.record_started = True
+            # self.start_socket.send_string("START_STIMULATION")  # Send start signal to o1-609
 
     def stop_recording(self):
         if self.record_started:
@@ -419,14 +459,16 @@ class CameraControl(QWidget):
             self.start_button.setEnabled(True)
             self.stop_button.setEnabled(True)
             self.record_started = False
+            self.recording_finished.emit(True)
 
-    def finish_recording(self, signal):
-        if self.record_started & signal:
-            self.sender.stop_recording()
-            self.record_button.setEnabled(True)
-            self.start_button.setEnabled(True)
-            self.stop_button.setEnabled(True)
-            self.record_started = False
+    # def finish_recording(self, signal):
+    #     if self.record_started & signal:
+    #         self.sender.stop_recording()
+    #         self.record_button.setEnabled(True)
+    #         self.start_button.setEnabled(True)
+    #         self.stop_button.setEnabled(True)
+    #         self.record_started = False
+    #         self.recording_finished.emit(True)
 
     def set_exposure(self):
         self.camera.set_exposure(self.exposure_spinbox.value())
@@ -463,6 +505,10 @@ class CameraControl(QWidget):
         # self.sender.set_params(filename = self.file_name_input.text())
         # self.filename = self.file_name_input.text()
 
+    # def set_video_number(self):
+    #     video_number = str(self.video_number_input.value())
+    #     self.video_number_ready.emit(video_number)
+
     def set_fourcc(self):
         fourcc = self.fourcc_input.text()
         self.fourcc_input.clearFocus()
@@ -475,44 +521,175 @@ class CameraControl(QWidget):
         self.fps_ready.emit(fps)
         # self.fps = int(self.encoding_fps_input.text())
 
-    # def show_preview(self):
-    #     self.camera_preview.setVisible(True)
-
-    # def hide_preview(self):
-    #     self.camera_preview.setVisible(False)
-
     def preview(self, image_ready: int):
         if image_ready:
             self.camera_preview.setPixmap(NDarray_to_QPixmap(self.sender.frame))
-    
-    # def send_params(self):
-    #     self.sender.set_params(filename = self.filename, 
-    #                            fps = self.fps, 
-    #                            fourcc = self.fourcc)
 
     def select_directory(self):
         self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if self.directory:
+        if self.directory and self.fish_id:
             self.directory_label.setText(f"Selected Directory: {self.directory}")
-            self.dir_ready.emit(str(self.directory))
-
-
-    def make_dir(self):
-        date_today = datetime.today()
-        self.date = date_today.strftime('%Y%m%d')
-        self.time_h_m = date_today.strftime('%H%M')
-        if self.directory and self.fish_number:
-            self.fish_id = self.date + self.fish_number
-            self.fish_dir = Path(self.directory, self.fish_id)
-            try: 
-                self.fish_dir.mkdir()
+            self.fish_dir = Path(self.directory, self.fish_id) 
+            if not self.fish_dir.exists():
+                self.fish_dir.mkdir(parents=True)
+                print(f'Fish folder {str(self.fish_dir)} created')
                 self.dir_ready.emit(str(self.fish_dir))
-            except FileExistsError:
-                print(f'directory {self.fish_dir} already exists')
+            else: 
+                print(f'Fish folder already exists')
+                self.dir_ready.emit(str(self.fish_dir))
+        else: 
+            print('please enter fish number')
+
 
     def set_fish_number(self):
         fish_number = self.fish_number_input.value()
         self.fish_number = f'{fish_number:03}' #adds leading zeros
+        date_today = datetime.today()
+        self.date = date_today.strftime('%Y%m%d')
+        # self.time_h_m = date_today.strftime('%H%M')
+        self.fish_id = self.date + self.fish_number
+
+    def set_stim_number(self):
+        stim_number = self.stimulation_number_input.value()
+        self.stim_number = stim_number
+        self.stim_folder = 'stim'+str(stim_number)
+        stim_folder_path = Path(self.fish_dir) / self.stim_folder
+        if not stim_folder_path.exists():
+            stim_folder_path.mkdir(parents=True)
+            print(f'stim folder {self.stim_folder} created')
+            self.stim_folder_path = str(stim_folder_path)
+            self.stim_dir_ready.emit(self.stim_folder_path)
+        else: 
+            print("stim folder already exists")
+            self.stim_folder_path = str(stim_folder_path)
+            self.stim_dir_ready.emit(self.stim_folder_path)
+        
+    def set_video_index(self, idx):
+        self.video_index = idx
+        self.video_idx_ready.emit(idx)
+
+
+class CameraMetadata:
+    def __init__(
+            self, 
+            cam_controls: CameraControl,
+            *args, 
+            **kwargs
+            ):
+        
+        super().__init__(*args, **kwargs)
+
+        self.cam_controls = cam_controls
+        # self.video_names = []
+
+    def get_metadata(self):
+        self.get_video_names()
+        self.get_id()
+        self.get_video_settings()
+        self.get_directory()
+        self.export_metadata()
+
+    # gets today's date and time and formats it into YYYYmmDDHHMM
+    # creates unique id with fish number 
+    
+    def get_video_names(self):
+        video_index = self.cam_controls.sender.video_index
+        filename = self.cam_controls.sender.filename 
+        self.video_name = filename + video_index
+        self.video_index = video_index
+        # self.video_names.append(filename + video_index)
+
+    def get_id(self):
+        self.id = self.cam_controls.fish_id
+    
+    # def set_fishline(self):
+    #     self.fishline = self.fishline_input.text()
+
+    # def set_condition(self):
+    #     self.condition = self.condition_input.text()
+    
+    def get_video_settings(self):
+        self.fps = self.cam_controls.camera.get_framerate()
+        self.exposure = self.cam_controls.camera.get_exposure()
+        self.gain = self.cam_controls.camera.get_gain()
+        self.width = self.cam_controls.camera.get_width()
+        self.height = self.cam_controls.camera.get_height()
+        self.fourcc = self.cam_controls.sender.fourcc
+        self.filename = self.cam_controls.sender.filename
+        self.video_start_time = self.cam_controls.sender.video_start_time 
+
+    def get_directory(self):
+        self.directory = self.cam_controls.stim_folder_path
+        # self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        # if self.directory: 
+        #     self.directory_label.setText(f'Selected directory: {self.directory}')
+
+    def export_metadata(self):
+        metadata_dict = {
+            'fish_id': self.id, 
+            'fps': self.fps, 
+            'exposure': self.exposure, 
+            'gain': self.gain, 
+            'frame_width': self.width, 
+            'frame_height': self.height, 
+            'fourcc': self.fourcc, 
+            'video_filename': self.filename,
+            'trial_index': self.video_index,
+            'video_start': self.video_start_time, 
+        }
+
+        metadata_path = Path(self.directory, self.video_name+'.json')
+
+        with open(metadata_path, 'w') as file:
+            json.dump(metadata_dict, file)
+
+
+class MessageReceiver(QRunnable): 
+    
+    def __init__(self, 
+                 protocol: str, 
+                 stim_host: str, 
+                 stim_port: int, 
+                #  cam_port: int,
+                 cam_controls: CameraControl, 
+                #  video_metadata: CameraMetadata,
+                 *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.cam_controls = cam_controls
+        self.video_metadata = CameraMetadata(cam_controls=self.cam_controls)
+        
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.SUB)
+        self.socket.connect(protocol + stim_host + ":" + str(stim_port))
+        self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        # self.socket.setsockopt_string(zmq.SUBSCRIBE, "START_RECORDING")
+        # self.socket.setsockopt_string(zmq.SUBSCRIBE, "STOP_RECORDING")
+
+    def run(self):
+        while True: 
+            message = self.socket.recv_string()  
+            if message == "START_RECORDING":
+                self.cam_controls.sender.start_recording()
+                print('Start message received')
+            elif message == "STOP_RECORDING": 
+                self.cam_controls.sender.stop_recording()
+                print('Stop message received')
+                self.video_metadata.get_metadata()
+            else: 
+                self.cam_controls.set_video_index(message)
+                print('index received: ', message)
+        
+                
+# class RunReceiver(QObject):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.threadpool = QThreadPool()
+#         self.receiver = MessageReceiver()
+#         self.threadpool.start(self.receiver)
+ 
+
 
 
 class CameraControl_MP(QWidget):
