@@ -205,7 +205,7 @@ class Metadata(QWidget):
     #write json with id
 
 
-class CameraMetadata(QWidget):
+class CameraMetadata:
     def __init__(
             self, 
             cam_controls: CameraControl,
@@ -216,18 +216,80 @@ class CameraMetadata(QWidget):
         super().__init__(*args, **kwargs)
 
         self.cam_controls = cam_controls
+        self.video_names = []
 
-        self.declare_components()
-        self.layout_components()
+    def get_metadata(self):
+        self.get_video_names()
+        self.get_id()
+        self.get_video_settings()
+        self.get_directory()
+        self.export_metadata()
+
+    # gets today's date and time and formats it into YYYYmmDDHHMM
+    # creates unique id with fish number 
+    
+    def get_video_names(self):
+        video_index = self.cam_controls.sender.video_index
+        filename = self.cam_controls.sender.filename 
+        self.video_name = filename + video_index
+        self.video_names.append(filename + video_index)
+
+    def get_id(self):
+        self.id = self.cam_controls.fish_id
+    
+    # def set_fishline(self):
+    #     self.fishline = self.fishline_input.text()
+
+    # def set_condition(self):
+    #     self.condition = self.condition_input.text()
+    
+    def get_video_settings(self):
+        self.fps = self.cam_controls.camera.get_framerate()
+        self.exposure = self.cam_controls.camera.get_exposure()
+        self.gain = self.cam_controls.camera.get_gain()
+        self.width = self.cam_controls.camera.get_width()
+        self.height = self.cam_controls.camera.get_height()
+        self.fourcc = self.cam_controls.sender.fourcc
+        self.filename = self.cam_controls.sender.filename
+        self.video_start_time = self.cam_controls.sender.video_start_time 
+
+    def get_directory(self):
+        self.directory = self.cam_controls.stim_folder_path
+        # self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        # if self.directory: 
+        #     self.directory_label.setText(f'Selected directory: {self.directory}')
+
+    def export_metadata(self):
+        metadata_dict = {
+            'fish_id': self.id, 
+            'fps': self.fps, 
+            'exposure': self.exposure, 
+            'gain': self.gain, 
+            'frame_width': self.width, 
+            'frame_height': self.height, 
+            'fourcc': self.fourcc, 
+            'video_filename': self.filename,
+            'video_start': self.video_start_time, 
+        }
+
+        metadata_path = Path(self.directory, self.video_name+'.json')
+
+        with open(metadata_path, 'w') as file:
+            json.dump(metadata_dict, file)
 
 
-    def initialise_widget(self, signal: int):
-        if signal: 
-            self.show()
-            self.get_id()
-            self.get_video_settings()
-            self.get_directory()
-
+class FishMetadata(QWidget):
+   
+    def __init__(
+            self, 
+            cam_controls: CameraControl,
+            *args, 
+            **kwargs
+            ):
+       
+        super().__init__(*args, **kwargs)
+        self.cam_controls = cam_controls
+        
     def declare_components(self):
         
         self.calendar_label = QLabel(self)
@@ -271,8 +333,6 @@ class CameraMetadata(QWidget):
         
         layout.addWidget(self.export_metadata_button)
 
-    # gets today's date and time and formats it into YYYYmmDDHHMM
-    # creates unique id with fish number 
     def get_id(self):
         self.id = self.cam_controls.fish_id
     
@@ -297,16 +357,6 @@ class CameraMetadata(QWidget):
         self.dpf_label.setText(f'Days post-fertilisation: {self.age}')
         print(self.age)
 
-    def get_video_settings(self):
-        self.fps = self.cam_controls.camera.get_framerate()
-        self.exposure = self.cam_controls.camera.get_exposure()
-        self.gain = self.cam_controls.camera.get_gain()
-        self.width = self.cam_controls.camera.get_width()
-        self.height = self.cam_controls.camera.get_height()
-        self.fourcc = self.cam_controls.sender.fourcc
-        self.filename = self.cam_controls.sender.filename
-        self.video_start_time = self.cam_controls.sender.video_start_time 
-
     def get_directory(self):
         self.directory = self.cam_controls.fish_dir
         # self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
@@ -320,20 +370,13 @@ class CameraMetadata(QWidget):
             'condition': self.condition, 
             'dob': self.dob, 
             'age': self.age, 
-            'fps': self.fps, 
-            'exposure': self.exposure, 
-            'gain': self.gain, 
-            'frame_width': self.width, 
-            'frame_height': self.height, 
-            'fourcc': self.fourcc, 
-            'video_filename': self.filename,
-            'video_start': self.video_start_time, 
         }
 
-        metadata_path = Path(self.directory, self.filename+'_camera.json')
+        metadata_path = Path(self.directory, 'fish_' + self.filename+'.json')
 
         with open(metadata_path, 'w') as file:
             json.dump(metadata_dict, file)
+
 
 import os 
 import json
