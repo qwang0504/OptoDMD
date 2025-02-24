@@ -17,8 +17,8 @@ if __name__ == "__main__":
     # SCANIMAGE_HOST = "o1-317"
     STIM_HOST = "o1-609"
     # SCANIMAGE_PORT = 5556
-    STIM_PORT = 5506
-    CAM_PORT = 5507
+    STIM_PORT = 5510
+    CAM_PORT = 5511
     
     app = QApplication(sys.argv)
 

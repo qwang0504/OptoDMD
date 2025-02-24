@@ -110,6 +110,7 @@ class FrameSenderCombined(QRunnable):
         self.keepgoing = False
 
     def set_fps(self, fps: int):
+        fps = 200
         self.fps = fps
 
     def set_filename(self, filename: str):
@@ -131,6 +132,7 @@ class FrameSenderCombined(QRunnable):
         self.file_dir = file_dir
 
     def set_fourcc(self, fourcc: str):
+        fourcc = 'XVID'
         self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
 
     def run(self):
