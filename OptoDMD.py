@@ -22,9 +22,9 @@ if __name__ == "__main__":
     PROTOCOL = "tcp://"
     SCANIMAGE_HOST = "o1-317"
     # STIM_HOST = "o1-609"
-    SCANIMAGE_PORT = 5572
-    STIM_PORT = 5506
-    CAM_PORT = 5507
+    SCANIMAGE_PORT = 5574
+    STIM_PORT = 5510
+    CAM_PORT = 5511
 
     # dmd settings
     SCREEN_DMD = 1
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     # Control DMD
     dmd_widget = DMD(screen_num=SCREEN_DMD)
-
+ 
     # Masks
     cam_drawer = DrawPolyMask(np.zeros((512,512)))
     dmd_drawer = DrawPolyMask(np.zeros((DMD_HEIGHT,DMD_WIDTH)))

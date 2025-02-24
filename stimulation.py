@@ -285,6 +285,7 @@ class StartStim(QRunnable):
                     self.stim_manager.socket.send_string(str(i))
                     self.stim_manager.socket.send_string("START_RECORDING")
                     print('signal sent: ', time.time())
+                    print('index: ', i)
                     time.sleep(2) #1s sleep at camera code already 
                     # self.clear_dmd.emit()
                     self.stim_manager.mask_expose.emit(key)
