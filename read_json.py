@@ -9,22 +9,27 @@ import time
 import cv2
 
 # Open and read the JSON file
-with open('video1.avi.json', 'r') as file:
-    m = json.load(file)
+with open('camera_test.json', 'r') as file:
+    cm = json.load(file)
 
-start = np.array(m['pulse_start'])
-end = np.array(m['pulse_end'])
-vstart = np.array(m['video_start'])
+with open('stim2.json', 'r') as file:
+    tm = json.load(file)
+
+start = np.array(tm['pulse_start'])
+end = np.array(tm['pulse_end'])
+vstart = np.array(cm['video_start'])
 
 start_frames = (start - vstart)*200
 
-actual = np.array([533, 6737, 12933, 19136, 25340, 31543, 37746, 
-                  43949, 50155, 56360, 62563, 68769, 74972, 81175, 
-                  87360, 93562, 99765, 105918, 112121, 118318])
+# actual = np.array([533, 6737, 12933, 19136, 25340, 31543, 37746, 
+#                   43949, 50155, 56360, 62563, 68769, 74972, 81175, 
+#                   87360, 93562, 99765, 105918, 112121, 118318])
+
+actual = np.array([206, 6410, 12616, 18820, 25022, 31184, 37387, 43504, 49763, 55827, 62030, 68233, 74353, 80557, 86609, 92680, 98883, 105171, 111246, 117406])
 
 actual - start_frames
 
-
+actual = np.array([183, 6410, 12616, 18820, 25022, 31184, 37387, 43504, 49763, 55827, 62030, 68233, 74353, 80557, 86609, 92680, 98883, 105171, 111246, 117406])
 
 
 
@@ -45,8 +50,24 @@ actual - start_frames
 
 
 
+with open('test/20241205001/stim1.json', 'r') as file:
+    m = json.load(file)
+
+start = np.array(m['pulse_start'])
+end = np.array(m['pulse_end'])
+
+light_appeared = 875
+vs = 875/200
+vstart = start[0] - vs
 
 
+start_frames = (start - vstart)*200
+
+actual = np.array([270, 3372, 6474, 9575, 12677, 15778, 
+                   18880, 21982, 25085, 28186, 31288, 
+                   34390, 37491 , 40592, 43695])
+
+actual - start_frames
 
 
 

@@ -1,5 +1,3 @@
-
-
 from camera_tools.camera import Camera
 from camera_tools.frame import Frame, BaseFrame
 from typing import Optional, Tuple
@@ -35,9 +33,15 @@ camera_controls = CameraControl(cam)
 camera_controls.show()
 
 daio = LabJackU3LV_new()
-led = LEDD1B(daio, pwm_channel=6, name = "465 nm") 
+led = LEDD1B(daio, pwm_channel=4, name = "465 nm") 
 led_widget = LEDWidget(led_drivers=[led])
 led_widget.show()
+
+while True: 
+    level = cam.get_gpi_level()
+    if level != 0:
+        print( level )
+
 
 # camera_controls = CameraControlRecording(cam)
 # camera_controls.show()
