@@ -1,5 +1,5 @@
 from camera_tools.camera import Camera
-from camera_tools.frame import Frame, BaseFrame
+# from camera_tools.frame import Frame, BaseFrame
 from typing import Optional, Tuple
 from ximea import xiapi
 from numpy.typing import NDArray
