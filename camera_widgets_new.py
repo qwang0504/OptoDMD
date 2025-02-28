@@ -3,7 +3,7 @@
 from PyQt5.QtCore import QTimer, pyqtSignal, pyqtSlot, QRunnable, QThreadPool, QObject
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QFileDialog
 from qt_widgets import LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, NDarray_to_QPixmap
-from camera_tools import Camera, Frame
+from camera_tools import Camera
 import numpy as np
 from video_writer import OpenCV_VideoWriter
 import cv2 
