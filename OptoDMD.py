@@ -16,6 +16,17 @@ import numpy as np
 from image_tools import DrawPolyMask
 import json
 
+from multiprocessing import Process, Pipe, Queue 
+
+class StimGUIProcess(Process):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+    def run(self):
+        #do_something
+
 if __name__ == "__main__":
 
     # zmq settings
