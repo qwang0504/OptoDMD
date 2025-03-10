@@ -3,9 +3,8 @@ from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
-from camera_tools import XimeaCamera, CameraControl
-# from camera_tools import CameraControl, OpenCV_Webcam
-from camera_widgets_new import CameraControl
+from camera_tools import XimeaCamera
+from camera_widgets import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
@@ -18,14 +17,18 @@ import json
 
 from multiprocessing import Process, Pipe, Queue 
 
-class StimGUIProcess(Process):
+class CamGUIProcess(Process):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-
     def run(self):
-        #do_something
+        app = QApplication(sys.argv)
+        cam = XimeaCamera(0)
+        camera_controls = CameraControl(cam)
+        camera_controls.show()
+        app.exec()
+
 
 if __name__ == "__main__":
 

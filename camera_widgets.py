@@ -13,10 +13,10 @@ from datetime import datetime
 import os
 import zmq
 import json
+from multiprocessing import Process, Pipe, Queue
 
 # TODO show camera FPS, display FPS, and camera statistics in status bar
 # TODO subclass CameraWidget for camera with specifi controls
-
 
 
 class FrameSignal(QObject):

@@ -1,7 +1,7 @@
 
 from camera_tools import XimeaCamera
 # from camera_tools import CameraControl, OpenCV_Webcam
-from camera_widgets_new import CameraControl, CameraMetadata
+from camera_widgets import CameraControl, CameraMetadata
 from PyQt5.QtWidgets import QApplication
 # from metadata import CameraMetadata
 

@@ -5,7 +5,7 @@ from stimulation import StimManager
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QCalendarWidget, QFileDialog
 from PyQt5.QtCore import QDate
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox
-from camera_widgets_new import CameraControl
+from camera_widgets import CameraControl
 import json
 from pathlib import Path
 from datetime import datetime
