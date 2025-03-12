@@ -1,118 +1,244 @@
-from Microscope import ImageSender, ScanImage
-from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
-from daq import LabJackU3LV, LabJackU3LV_new
-from LED import LEDD1B, LEDWidget
-from DMD import DMD
-from camera_tools import XimeaCamera
+from camera_tools import XimeaCamera, Camera
 from camera_widgets import CameraControl
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QThreadPool
-from stimulation import StimManager
-from metadata import StimMetadata
-
+from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout
+from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
+from qt_widgets import NDarray_to_QPixmap
 import sys
 import numpy as np
-from image_tools import DrawPolyMask
 import json
 import psutil
-from ipc_tools import ring_buffer
+from ipc_tools import RingBuffer, Logger
+import multiprocessing
+from multiprocessing import Process, Pipe, Queue, connection
+import threading
+from threading import Thread
+from functools import partial
+from typing import Callable
+import time
+from queue import Empty
+import logging
 
-from multiprocessing import Process, Pipe, Queue 
+class TestSender(QObject):
+    frameReady = pyqtSignal()
 
-class CamGUIProcess(Process):
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, 
+                 display_buffer: RingBuffer,
+                 *args, 
+                 **kwargs):
         super().__init__(*args, **kwargs)
+        self.display_buffer = display_buffer
+        self.active = True
+
+    def terminate(self):
+        self.active = False
 
     def run(self):
-        app = QApplication(sys.argv)
-        
-        cam = XimeaCamera(0)
-        camera_controls = CameraControl(cam)
-        camera_controls.show()
-        
-        app.exec()
+        print('TestSender running')
+        time.sleep(1)
+        while self.active: 
+            try:
+                self.frame = self.display_buffer.get()
+                print(display_buffer.qsize())
+            # print size of display_buffer
+                self.frameReady.emit()
+            except Empty:
+                pass
+                # print('buffer empty')
 
 
+class TestCamWidget(QWidget):
+
+    def __init__(self, 
+                 front_pipe: connection.Connection,
+                 display_buffer: RingBuffer,
+                 width,
+                 height,
+                 *args, 
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.front_pipe = front_pipe
+        self.display_buffer = display_buffer
+        self.width = width
+        self.height = height
+        self.worker = None
+
+        self.declare_components()
+        self.layout_components()
+
+    def declare_components(self):
+        self.start_button = QPushButton(self)
+        self.start_button.setText('start')
+        self.start_button.clicked.connect(self.start_acquisition)
+
+        self.stop_button = QPushButton(self)
+        self.stop_button.setText('stop')
+        self.stop_button.clicked.connect(self.stop_acquisition)
+
+        self.terminate_button = QPushButton(self)
+        self.terminate_button.setText('terminate')
+        self.terminate_button.clicked.connect(self.terminate)
+
+        self.camera_preview = QLabel(self)
+        self.camera_preview.setFixedSize(self.width, self.height)
+
+    def layout_components(self):
+        layout_start_stop = QHBoxLayout()
+        layout_start_stop.addWidget(self.start_button)
+        layout_start_stop.addWidget(self.stop_button)
+        layout_start_stop.addWidget(self.terminate_button)
+        layout_start_stop.addStretch()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.camera_preview)
+        layout.addLayout(layout_start_stop)
+
+        self.setLayout(layout)
+
+
+### Callbacks
+    def start_acquisition(self):
+        self.front_pipe.send('start')
+        print('Main process sent start command')
+        self.worker = TestSender(self.display_buffer)
+        self.worker.frameReady.connect(self.update_preview)
+        self.qthread = QThread()
+        self.worker.moveToThread(self.qthread)
+        self.qthread.started.connect(self.worker.run)
+        self.qthread.start()
+    
+    def stop_acquisition(self):
+        self.front_pipe.send('stop')
+        time.sleep(1)
+        if self.worker:
+            self.worker.terminate()
+            self.qthread.quit()
+
+    def terminate(self):
+        self.front_pipe.send('terminate')
+    
+    def update_preview(self):
+        self.camera_preview.setPixmap(NDarray_to_QPixmap(self.worker.frame))
+
+
+class TestCamWorker:
+    def __init__(self, 
+                 display_buffer: RingBuffer, 
+                 camera: Camera, 
+                 *args,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.display_buffer = display_buffer
+        self.camera = camera
+        self.active = True
+        self.acquisition_started = False
+        self.is_waiting = threading.Event()
+        self.is_waiting.set()
+    
+    def start_acquisition(self):
+        self.camera.start_acquisition()
+        self.acquisition_started = True
+        self.is_waiting.set()
+    
+    def stop_acquisition(self):
+        self.acquisition_started = False
+        self.camera.stop_acquisition()
+        self.is_waiting.clear()
+
+    def terminate(self):
+        self.active = False
+
+    def run(self):
+        while self.active:
+            self.is_waiting.wait()
+            if self.acquisition_started:
+                frame = self.camera.get_frame()
+                if frame.image is not None:
+                    self.display_buffer.put(frame.image)
+
+class TestCamProcess(Process):
+    def __init__(self, 
+                 back_pipe: connection.Connection, #because Pipe is not a type but a function
+                 display_buffer: RingBuffer,
+                 camera_constructor: Callable[[int], Camera],
+                 *args, 
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.back_pipe = back_pipe
+        self.display_buffer = display_buffer
+        self.camera_constructor = camera_constructor
+        self.active = True
+        self.test_worker = None
+
+    # add some init method and cleanup method for before and after while loop 
+    def init_cam(self):
+        self.camera = self.camera_constructor()
+
+    # def release_cam(self):
+    
+    def run(self):
+        print('CamProcess started')
+        self.init_cam()
+        while self.active: 
+            msg = self.back_pipe.recv()
+            if msg == 'start':
+                print('CamProcess received start command')
+                if self.test_worker is None:
+                    self.test_worker = TestCamWorker(self.display_buffer, self.camera)
+                    self.thread = Thread(target=self.test_worker.run)
+                    self.thread.start()
+                self.test_worker.start_acquisition()
+                
+            elif msg == 'stop' and self.test_worker:
+                print('CamProcess received stop message')
+                self.test_worker.stop_acquisition()
+            
+            elif msg == 'terminate':
+                if self.test_worker:
+                    self.test_worker.terminate()
+                    self.thread.join()
+                self.active = False
+
+    
 if __name__ == "__main__":
+    # camera = XimeaCamera(0)
+    # width = camera.get_width()
+    # height = camera.get_height()
+    # print(width, height)
 
-    # zmq settings
-    PROTOCOL = "tcp://"
-    SCANIMAGE_HOST = "o1-317"
-    # STIM_HOST = "o1-609"
-    SCANIMAGE_PORT = 5574
-    STIM_PORT = 5510
-    CAM_PORT = 5511
+    width = 648
+    height = 488
+    
+    camera_constructor = partial(XimeaCamera, dev_id=0)
 
-    # dmd settings
-    SCREEN_DMD = 1
-    DMD_HEIGHT = 1140
-    DMD_WIDTH = 912
+    display_buffer = RingBuffer(num_items=200, 
+                                data_type=np.uint8, 
+                                item_shape=(height, width),
+                                t_refresh=1e-6)
+    
+    front_pipe, back_pipe = Pipe()
+    cam_process = TestCamProcess(back_pipe=back_pipe, 
+                                 display_buffer=display_buffer, 
+                                 camera_constructor=camera_constructor)
+    cam_process.start()
 
-    # labjack settingss
-    PWM_CHANNEL = 6
-
-    # calibration file
-    transformations = np.tile(np.eye(3), (3,3,1,1))
-    try:
-        with open('calibration_3x/calibration.json', 'r') as f:
-            calibration = json.load(f)
-
-        # 0: cam, 1: dmd, 2: twop
-        transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
-        transformations[0,2] = np.asarray(calibration["cam_to_twop"])
-        transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
-        transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
-        transformations[2,0] = np.asarray(calibration["twop_to_cam"])
-        transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
-    except:
-        print("calibration couldn't be loaded, defaulting to identity")
-   
     app = QApplication(sys.argv)
 
-    # Control LEDs
-    daio = LabJackU3LV_new()
-    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
-    led_widget = LEDWidget(led_drivers=[led])
-    # led_widget.show()
+    widget = TestCamWidget(front_pipe=front_pipe, 
+                           display_buffer=display_buffer,
+                           width=width,
+                           height=height)
+    
+    widget.show()
 
-    # Control DMD
-    dmd_widget = DMD(screen_num=SCREEN_DMD)
- 
-    # Masks
-    cam_drawer = DrawPolyMask(np.zeros((512,512)))
-    dmd_drawer = DrawPolyMask(np.zeros((DMD_HEIGHT,DMD_WIDTH)))
-    twop_drawer = DrawPolyMask(np.zeros((512,512)))
-
-    cam_mask = DrawPolyMaskOpto(cam_drawer)
-    dmd_mask = DrawPolyMaskOptoDMD(dmd_drawer)
-    twop_mask = DrawPolyMaskOpto(twop_drawer)
-
-    masks = MaskManager([cam_mask, dmd_mask, twop_mask], ["Camera", "DMD", "Two Photon"], transformations)
-    masks.show()
-    # masks.print_names()
-
-    stim = StimManager(mask_manager=masks, 
-                       led_driver=led, 
-                       protocol=PROTOCOL,
-                       cam_host=SCANIMAGE_HOST,
-                       stim_port=STIM_PORT)
-    stim.show()
-
-    # metadata = Metadata(stim_manager=stim, cam_controls=camera_controls)
-    stim_metadata = StimMetadata(stim_manager=stim)
-
-    # connect signals and slots
-    dmd_mask.DMD_update.connect(dmd_widget.update_image)
-    masks.mask_expose.connect(dmd_mask.expose)
-    stim.mask_expose.connect(dmd_mask.expose)
-    masks.clear_dmd.connect(dmd_mask.clear)
-    stim.clear_dmd.connect(dmd_mask.clear)
-    # camera_controls.image_ready.connect(cam_mask.set_image)
-    # stim.run_complete.connect(camera_controls.finish_recording)
-    stim.run_complete.connect(stim_metadata.initialise_widget)
-
+    # Start the Qt event loop
     app.exec()
 
-    cam_process = CamGUIProcess()
-    cam_process.start()
+
+    ## define the camera before the run() method as an initialise() method, also implement some cleanup after while loops
+    ## probably define cameras within the worker threads 
+    ## numpy.shape by default is (height, width)
+# https://github.com/ElTinmar/ZebVR/blob/main/ZebVR/workers/queue_monitor.py --> logging queue status
+# https://github.com/ElTinmar/dagline/blob/main/dagline/worker.py --> try except block
