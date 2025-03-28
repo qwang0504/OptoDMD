@@ -15,10 +15,49 @@ from multiprocessing import Process, Pipe, Queue, Event
 from ipc_tools import RingBuffer
 from threading import Thread
 
+# TODO: synchronise recording with stim manager 
 
-class FrameSignal(QObject):
-    frame_ready = pyqtSignal(int)
+class CameraWorker:
+    def __init__(self, 
+                 camera: Camera, 
+                 display_buffer: RingBuffer, 
+                 save_buffer: RingBuffer,
+                 *args, 
+                 **kwargs):
+        self.camera = camera
+        self.display_buffer = display_buffer
+        self.save_buffer = save_buffer
+        self.active = True
+        self.acquisition_started = False
     
+    def start_acquisition(self):
+        self.camera.start_acquisition()
+        time.sleep(1)
+        self.acquisition_started = True
+
+    def stop_acquisition(self):
+        self.acquisition_started = False
+        time.sleep(1)
+        self.camera.stop_acquisition()
+
+    def terminate(self):
+        self.active = False 
+
+    def run_display(self):
+        while self.active: 
+            if self.acquisition_started:
+                frame = self.camera.get_frame()
+                if frame.image is not None:
+                    self.display_buffer.put(frame)
+
+    def run_save(self):
+        while self.active: 
+            if self.acquisition_started:
+                frame = self.camera.get_frame()
+                if frame.image is not None: 
+                    self.display_buffer.put(frame)
+                    self.save_buffer.put(frame)
+                
 
 class CameraProcess(Process):
     def __init__(self,
@@ -64,26 +103,32 @@ class CameraProcess(Process):
     
     def set_camera_params(self):
         msg = self.back_pipe_gui.recv()
-
+        # set all camera parameters from GUI inputs 
+        # this needs to be responsive to any changes in the GUI... 
 
     def run(self):
         self.send_default_params()
-        self.set_camera_params()
         while self.active:
             msg = self.back_pipe_gui.recv()
             if msg == 'start_acquisition':
-                self.camera.start_acquisition()
-                frame = self.camera.get_frame()
-                if frame.image is not None:
-                    self.display_buffer.put(frame)
-            elif msg == 'stop_acquisition':
-                self.camera.stop_acquisition()
+                self.camera_worker = CameraWorker(self.camera, 
+                                                   self.display_buffer, 
+                                                   self.save_buffer)
+                self.worker_thread = Thread(target=self.camera_worker.run_display)
+                self.camera_worker.start_acquisition()
+                self.worker_thread.start()
+               
+            elif msg == 'stop_acquisition' and self.camera_worker is not None:
+                self.camera_worker.stop_acquisition()
+
             elif msg == 'start_recording':
-                self.camera.start_acquisition()
-                frame = self.camera.get_frame()
-                if frame.image is not None: 
-                    self.save_buffer.put(frame)
-                    self.display_buffer.put(frame)
+                self.camera_worker = CameraWorker(self.camera, 
+                                                   self.display_buffer, 
+                                                   self.save_buffer)
+                self.worker_thread = Thread(target=self.camera_worker.run_save)
+                self.camera_worker.start_acquisition()
+                self.worker_thread.start()
+
             elif msg == 'stop_recording':
                 self.camera.stop_acquisition()
 
@@ -93,29 +138,46 @@ class SaveWorker:
                  frame_rate, 
                  exposure, 
                  gain, 
-                 frame_size, 
+                 height,
+                 width,
+                 file_name,
                  file_path,
+                 fourcc,
                  buffer,
                  *args, 
                  **kwargs):
-        super().__init__(*args, **kwargs)
 
-        self.frame_rate = frame_rate
+        self.fps = frame_rate
         self.exposure = exposure
         self.gain = gain
-        self.frame_size = frame_size
+        self.height = height
+        self.width = width
+        self.file_name = file_name
         self.file_path = file_path
-        
+        self.fourcc = fourcc
+        self.buffer = buffer
 
-    def start():
-        #init video writer
-        frame = buffer.get()
-        video_writer.write(frame)
+        self.active = True
+
+    def init_videowriter(self):
+        self.video_writer = OpenCV_VideoWriter(self.height, 
+                                               self.width, 
+                                               self.fps, 
+                                               self.file_path, 
+                                               self.fourcc)
+
+    def run(self):
+        self.init_videowriter()
+        while self.active: 
+            frame = self.buffer.get()
+            self.video_writer.write(frame)
     
-    def stop():
+    def stop(self):
         #stop saving frames
-        video_writer.release()
+        self.video_writer.close()
 
+    def terminate(self):
+        self.active = False 
         
 
 
@@ -138,7 +200,7 @@ class VideoWriterProcess(Process):
                 self.save_worker = SaveWorker(params, save_buffer)
                 # for param, value in msg['start'].items():
                 #     setattr(self, param, value)
-                self.worker_thread = Thread(target=self.save_worker.start)
+                self.worker_thread = Thread(target=self.save_worker.run)
                 self.worker_thread.start()
             
             elif msg == 'stop' and self.save_worker:
@@ -250,7 +312,7 @@ class CameraWidget(QWidget):
 
         self.stop_record_button = QPushButton(self)
         self.stop_record_button.setText('stop recording')
-        self.stop_record_button.clicked.connect(self.stop_recording)
+        self.stop_record_button.clicked.connect(self.stop_recording) #lock down all buttons except for stop when recording started 
 
         self.instructions = QLabel(self)
         self.instructions.setText('please press Enter after input')
