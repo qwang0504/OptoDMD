@@ -1,0 +1,16 @@
+Benchmarking conditions
+- 250 fps, 1000 us exposure
+- recorded frames put into the buffer from the camera (cam_frames) 
+- recorded frames extracted from the buffer (sink_frames)
+- all frames were placed into the buffer as structured arrays, image extracted with frame['image']
+- start relay process, send start message, sleep(5), start sink, sleep(5), send stop message, sleep(3), send terminate message 
+
+- AQ: using ArrayQueues
+- MRB: using ModifiableRingBuffer
+- highres: using high resolution windows timer (1 msec), t_refresh=1e-3
+- threads: using threads and workers to listen for messages on the same process (sleep(10) between start and stop)
+
+*Note: modified RingBuffer and ModifiableRingBuffer (ring_buffer.py) to include try-except in get() to catch Empty exception from get_noblock()
+
+
+ 

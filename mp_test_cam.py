@@ -19,6 +19,7 @@ from queue import Empty
 import logging
 # from video_writer import OpenCV_VideoWriter
 from video_tools import OpenCV_VideoWriter, FFMPEG_VideoWriter_CPU_Grayscale
+from arrayqueues import ArrayQueue
 
 # TODO: synchronise recording with stim manager 
 # TODO: progress bar for buffer capacity
@@ -226,8 +227,8 @@ class TestBufferRelay:
         while self.active:
             self.event.wait()
             frame = self.camera.get_frame()
-            if frame.image is not None:
-                self.display_buffer.put(frame.image)
+            if frame['image'] is not None:
+                self.display_buffer.put(frame['image'])
 
 
 class TestDoubleBufferRelay:
@@ -265,9 +266,9 @@ class TestDoubleBufferRelay:
         while self.active:
             self.event.wait()
             frame = self.camera.get_frame()
-            if frame.image is not None:
-                self.display_buffer.put(frame.image)
-                self.save_buffer.put(frame.image)
+            if frame['image'] is not None:
+                self.display_buffer.put(frame['image'])
+                self.save_buffer.put(frame['image'])
 
 
 class TestFrameSaveWorker: 
@@ -477,13 +478,16 @@ if __name__ == "__main__":
     
     camera_constructor = partial(XimeaCamera, dev_id=0)
 
-    display_buffer = RingBuffer(num_items=200, 
-                                data_type=np.uint8, 
-                                item_shape=(height, width))
+    # display_buffer = RingBuffer(num_items=200, 
+    #                             data_type=np.uint8, 
+    #                             item_shape=(height, width))
 
-    save_buffer = RingBuffer(num_items=200,
-                             data_type=np.uint8,
-                             item_shape=(height, width))
+    # save_buffer = RingBuffer(num_items=200,
+    #                          data_type=np.uint8,
+    #                          item_shape=(height, width))
+    
+    display_buffer = ArrayQueue(200)
+    save_buffer = ArrayQueue(500)
     
     front_pipe_cam, back_pipe_cam = Pipe()
     front_pipe_save, back_pipe_save = Pipe()
