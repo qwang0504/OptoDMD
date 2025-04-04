@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import json
 import psutil
-from ipc_tools import RingBuffer, Logger
+from ipc_tools import RingBuffer, ModifiableRingBuffer, Logger
 import multiprocessing
 from multiprocessing import Process, Pipe, Queue, connection
 import threading
@@ -21,7 +21,10 @@ import logging
 from video_tools import OpenCV_VideoWriter, FFMPEG_VideoWriter_CPU_Grayscale
 import matplotlib.pyplot as plt
 import cv2
-from camera_tools import BaseFrame
+# from camera_tools import BaseFrame
+from arrayqueues import ArrayQueue
+
+# 250 fps = 4 ms per frame, exposure cannot be longer than 4000 usec
 
 class TestCamProcess(Process):
     def __init__(self, 
@@ -41,7 +44,7 @@ class TestCamProcess(Process):
     # add some init method and cleanup method for before and after while poop 
     def init_cam(self):
         self.camera = self.camera_constructor()
-        print(f'Exposure: {self.camera.get_exposure()}')
+        print(f'Exposure: {self.camera.get_exposure()}') #exposure time in microseconds
         print(f'Frame rate: {self.camera.get_framerate()}')
         self.camera.set_exposure(1000)
         self.camera.set_framerate(250)
@@ -50,6 +53,7 @@ class TestCamProcess(Process):
         print('CamProcess started')
         self.init_cam()
         print(self.camera.get_framerate())
+        print(self.camera.get_exposure())
         while self.active: 
             msg = self.back_pipe.recv()
             if msg == 'start_recording':
@@ -110,10 +114,10 @@ class TestBufferRelay:
         while self.active:
             self.event.wait()
             frame = self.camera.get_frame()
-            if frame.image is not None:
-                self.buffer.put(frame.image)
-                print(frame.index, frame.timestamp)
-            fd.write(f"{frame.index}, {frame.timestamp}\n")
+            if frame['image'] is not None:
+                self.buffer.put(frame['image'])
+                fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                print(frame['index'], frame['timestamp'])
         fd.close()
 
 
@@ -170,7 +174,7 @@ class TestFrameSaveWorker:
             continue
         self.video_writer.release()
         self.active = False
-        print('Lost items: ', self.save_buffer.num_lost_item.value)
+        # print('Lost items: ', self.save_buffer.num_lost_item.value)
 
     def run(self):
         # f = open('save_frame_count.txt', 'w')
@@ -244,10 +248,12 @@ if __name__ == "__main__":
     front_pipe_save, back_pipe_save = Pipe()
     front_pipe_cam, back_pipe_cam = Pipe()
 
-    save_buffer = RingBuffer(num_items=300,
-                             data_type=np.uint8,
-                             item_shape=(height, width))
+    # save_buffer = RingBuffer(num_items=300,
+    #                          data_type=np.uint8,
+    #                          item_shape=(height, width))
     
+    save_buffer = ArrayQueue(500)
+
     save_process = TestSaveProcess(back_pipe=back_pipe_save,
                                    save_buffer=save_buffer)
     
@@ -255,9 +261,12 @@ if __name__ == "__main__":
                                  save_buffer=save_buffer,
                                  camera_constructor=camera_constructor)
     
+
+    
     cam_process.start()
     save_process.start()
 
+    time.sleep(5)
 
     front_pipe_cam.send('start_recording')
     front_pipe_save.send('start_recording')
