@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 
 dtype = [('index', int), ('timestamp', np.float64)]
 
-cam = np.loadtxt('testing/cam_frames_threads_MRB_highres.txt', delimiter=',', dtype=dtype)
-sink = np.loadtxt('testing/sink_frames_threads_MRB_highres.txt', delimiter=',', dtype=dtype)
+cam = np.loadtxt('cam_frames_AQ_200.txt', delimiter=',', dtype=dtype)
+sink = np.loadtxt('sink_frames_AQ_200.txt', delimiter=',', dtype=dtype)
 
 plt.plot(np.diff(cam['timestamp']))
 plt.plot(np.diff(sink['timestamp']))
