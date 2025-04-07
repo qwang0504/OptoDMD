@@ -37,7 +37,7 @@ class CameraProcess(Process):
     def init_cam(self):
         self.camera = self.camera_constructor()
         self.camera.set_exposure(1000)
-        self.camera.set_framerate(250)
+        self.camera.set_framerate(200)
         print('cam initialised')
 
     def start_acquisition(self):
@@ -47,13 +47,13 @@ class CameraProcess(Process):
         self.camera.stop_acquisition()
     
     def run(self):
-        winmm = ctypes.WinDLL('winmm.dll')
-        winmm.timeBeginPeriod(1)
+        # winmm = ctypes.WinDLL('winmm.dll')
+        # winmm.timeBeginPeriod(1)
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
         self.init_cam()
         self.start_acquisition()
         self.previous_qsize = -1
-        fd = open('cam_frames_AQ_highres.txt', 'w')
+        fd = open('cam_frames_AQ_200.txt', 'w')
         while not self.terminate_event.is_set():
             if self.start_event.is_set():
                 # self.event.wait()
@@ -71,7 +71,7 @@ class CameraProcess(Process):
                 self.stop_acquisition()
                 # print('camera acquisition stopped')
                 fd.close()
-                winmm.timeEndPeriod(1)
+                # winmm.timeEndPeriod(1)
                 time.sleep(1)
                 
   
@@ -136,12 +136,12 @@ class Sink(Process):
     def run(self):
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
         previous_qsize = -1
-        fd = open('sink_frames_AQ_highres.txt', 'w')
-        winmm = ctypes.WinDLL('winmm.dll')
-        winmm.timeBeginPeriod(1)
+        fd = open('sink_frames_AQ_200.txt', 'w')
+        # winmm = ctypes.WinDLL('winmm.dll')
+        # winmm.timeBeginPeriod(1)
         while self.active:
             try:
-                frame = self.buffer.get(timeout=10)
+                frame = self.buffer.get(timeout=3)
                 if frame is not None:
                     # print(f"got frame number {frame['index']}")
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
@@ -155,7 +155,7 @@ class Sink(Process):
                 # self.buffer.clear()
                 fd.close()
                 self.active = False
-                winmm.timeEndPeriod(1)
+                # winmm.timeEndPeriod(1)
                 # break 
         print('sink loop finished')
        
@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
     # winmm = ctypes.WinDLL('winmm.dll')
     # winmm.timeBeginPeriod(1)
-    # winmm.timeEndPeriod(1)
+
 
     message_process.start()
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     time.sleep(5)
     sink = Sink(buffer=buffer)
     sink.start()
-    time.sleep(5)
+    time.sleep(10)
     front_pipe.send('stop')
     time.sleep(2)
     front_pipe.send('terminate')
@@ -229,6 +229,7 @@ if __name__ == "__main__":
     message_process.join()
     sink.join()
 
+    # winmm.timeEndPeriod(1)
 
 
 
