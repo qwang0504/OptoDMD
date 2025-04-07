@@ -37,7 +37,7 @@ class CameraProcess(Process):
     def init_cam(self):
         self.camera = self.camera_constructor()
         self.camera.set_exposure(1000)
-        self.camera.set_framerate(250)
+        self.camera.set_framerate(200)
         print(f'Exposure: {self.camera.get_exposure()}') #exposure time in microseconds
         print(f'Frame rate: {self.camera.get_framerate()}')
 
@@ -112,10 +112,10 @@ class BufferRelay:
         print('BufferRelay worker started')
         self.init_time = time.perf_counter_ns()
         print(f"Initialisation time for BufferRelay is {(self.init_time - self.start_time)/1e9}")
-        winmm = ctypes.WinDLL('winmm.dll')
-        winmm.timeBeginPeriod(1)
+        # winmm = ctypes.WinDLL('winmm.dll')
+        # winmm.timeBeginPeriod(1)
         self.previous_qsize = -1
-        fd = open('cam_frames_threads_AQ_highres.txt', 'w')
+        fd = open('cam_frames_threads_AQ_200.txt', 'w')
         while self.active:
             if self.event.is_set():
                 self.current_qsize = self.buffer.qsize()
@@ -128,7 +128,7 @@ class BufferRelay:
                         print(f'Camera buffer queue size: {self.current_qsize}')
                         self.previous_qsize = self.current_qsize
         fd.close()
-        winmm.timeEndPeriod(1)
+        # winmm.timeEndPeriod(1)
 
 
 class SinkWorker:
@@ -149,10 +149,10 @@ class SinkWorker:
         print('SinkWorker running')
         self.init_time = time.perf_counter_ns()
         print(f"Initialisation time for SinkWorker is {(self.init_time - self.start_time)/1e9}")
-        winmm = ctypes.WinDLL('winmm.dll')
-        winmm.timeBeginPeriod(1)
+        # winmm = ctypes.WinDLL('winmm.dll')
+        # winmm.timeBeginPeriod(1)
         self.previous_qsize = -1
-        fd = open('sink_frames_threads_AQ_highres.txt', 'w')
+        fd = open('sink_frames_threads_AQ_200.txt', 'w')
         
 
         while self.active:  
@@ -167,7 +167,7 @@ class SinkWorker:
                     self.previous_qsize = self.current_qsize
             except Empty:
                 self.terminate()
-                winmm.timeEndPeriod(1)
+                # winmm.timeEndPeriod(1)
                 print('sink buffer empty, exiting')
 
 
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     time.sleep(1)
     front_pipe_sink.send('start')
 
-    time.sleep(10)
+    time.sleep(25)
 
     front_pipe_cam.send('stop')
     front_pipe_sink.send('stop')
