@@ -14,4 +14,21 @@ Benchmarking conditions
 *Note: modified RingBuffer and ModifiableRingBuffer (ring_buffer.py) to include try-except in get() to catch Empty exception from get_noblock()
 
 - Threads method + 200 fps seems to work safely for 10-15s of recording. At frame ~4000 or so is when frame-dropping starts 
- 
+- Most reliable conditions so far without frame-dropping
+    - Threads method
+    - ArrayQueue(100) --> queue never fills up beyond 2 items
+    - 200 to 250 fps
+    - high-res timer defined within run() of each process and worker
+    - no high-res timer defined in the main process
+    - time.sleep(5) between defining processes and sending "start" to allow for initialisation
+    - no time.sleep() between sending "start" to source and sink processes
+    - no time.sleep() between "stop" and "terminate" messages
+    - defining and putting sentinel (structured array with np.zeros as image) in buffer when acquisition is stopped, raise Empty passes
+
+- Current best video encoding conditions
+    - FFMPEG_VideoWriter_CPU_Grayscale
+    - codec='h264'
+    - q=5 (lower = better quality and bigger files, will be more taxing to encode)
+    - preset='superfast' (will lose more frames at lower speeds)
+    - profile='high' (not sure what this means, only option available for this class)
+    
