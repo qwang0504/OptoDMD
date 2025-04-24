@@ -18,146 +18,111 @@ import matplotlib.pyplot as plt
 import cv2
 from arrayqueues import ArrayQueue
 import ctypes
+from mp_save_process import SaveProcess
 
-
-class CameraProcess(Process):
-    def __init__(self,
-                 camera_constructor: Callable[[int], Camera],
-                 start_event,
-                 terminate_event,
-                 buffer: ArrayQueue,
-                 *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.camera_constructor = camera_constructor
-        self.start_event = start_event
-        self.terminate_event = terminate_event
-        self.buffer = buffer
-        self.active = True
-
-    def init_cam(self):
-        self.camera = self.camera_constructor()
-        self.camera.set_exposure(1000)
-        self.camera.set_framerate(200)
-        print('cam initialised')
-
-    def start_acquisition(self):
-        self.camera.start_acquisition()
-    
-    def stop_acquisition(self):
-        self.camera.stop_acquisition()
-    
-    def run(self):
-        # winmm = ctypes.WinDLL('winmm.dll')
-        # winmm.timeBeginPeriod(1)
-        print(f"Process: {self.name}, ID: {self.pid} is starting...")
-        self.init_cam()
-        self.start_acquisition()
-        self.previous_qsize = -1
-        fd = open('cam_frames_AQ_200.txt', 'w')
-        while not self.terminate_event.is_set():
-            if self.start_event.is_set():
-                # self.event.wait()
-                self.current_qsize = self.buffer.qsize()
-                frame = self.camera.get_frame()
-                if frame is not None:
-                    self.buffer.put(frame)
-                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
-                    # print(f"camera frames: {frame['index']}, {frame['timestamp']}")
-
-                if self.current_qsize != self.previous_qsize:
-                    print(f'cam buffer queue size: {self.current_qsize}')
-                    self.previous_qsize = self.current_qsize
-            else: 
-                self.stop_acquisition()
-                # print('camera acquisition stopped')
-                fd.close()
-                # winmm.timeEndPeriod(1)
-                time.sleep(1)
-                
-  
 
 class MessageRelay(Process):
     def __init__(self, 
                  back_pipe_gui: connection.Connection,
+                 front_pipe_cam: connection.Connection,
+                 front_pipe_save: connection.Connection,
                  camera_constructor: Callable[[int], Camera],
-                 buffer: ArrayQueue,
+                 display_buffer: ArrayQueue,
+                 save_buffer: ArrayQueue,
+                 sentinel_array: np.ndarray,
                  start_event,
                  terminate_event,
                  *args, **kwargs):
         
         super().__init__(*args, **kwargs)
+        
         self.back_pipe_gui = back_pipe_gui
+        self.front_pipe_cam = front_pipe_cam
+        self.front_pipe_save = front_pipe_save
+
         self.camera_constructor = camera_constructor
-        self.buffer = buffer
+        self.display_buffer = display_buffer
+        self.save_buffer = save_buffer
+
         self.start_event = start_event
         self.terminate_event = terminate_event
-        self.camera_process = None
 
+        self.sentinel_array = sentinel_array
+        self.camera_process = None
         self.active = True
 
-    # def terminate(self):
-    #     self.active = False
 
     def run(self):
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
         while self.active:
             msg = self.back_pipe_gui.recv()
-            if msg == 'start' and self.camera_process is None:
-                self.camera_process = CameraProcess(camera_constructor=self.camera_constructor,
-                                                    start_event=self.start_event,
-                                                    terminate_event=self.terminate_event,
-                                                    buffer=self.buffer)
-                self.camera_process.start()
+            print(f"Process: {self.name} received {msg}")
+            
+            if msg == 'start_acquisition': 
+                self.front_pipe_cam.send('display')
+                time.sleep(0.5)
                 self.start_event.set()
 
-
-            elif msg == 'start' and self.camera_process:
-                print('start received')
-                self.start_event.set()
-
-            elif msg == 'stop':
-                print('stop received')
+            elif msg == 'stop_acquisition':
+                self.display_buffer.put(self.sentinel_array)
                 self.start_event.clear()
 
+            elif msg == 'start_recording':
+                params = self.back_pipe_gui.recv()
+                self.front_pipe_save.send(params)
+                self.front_pipe_cam.send('save')
+                self.start_event.set()
+
+            elif msg == 'stop_recording':
+                self.save_buffer.put(self.sentinel_array)
+                self.display_buffer.put(self.sentinel_array)
+                self.start_event.clear()                
+
             elif msg == 'terminate':
-                print('terminate received')
                 self.terminate_event.set()
-                self.camera_process.join()
-                break
-
-
-class Sink(Process):
-    def __init__(self, 
-                 buffer):
-        super().__init__()
-        self.buffer = buffer
-        self.active = True
-    
-    def run(self):
-        print(f"Process: {self.name}, ID: {self.pid} is starting...")
-        previous_qsize = -1
-        fd = open('sink_frames_AQ_200.txt', 'w')
-        # winmm = ctypes.WinDLL('winmm.dll')
-        # winmm.timeBeginPeriod(1)
-        while self.active:
-            try:
-                frame = self.buffer.get(timeout=3)
-                if frame is not None:
-                    # print(f"got frame number {frame['index']}")
-                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
-                    current_qsize = self.buffer.qsize()
-                    if current_qsize != previous_qsize:
-                        print(f"Sink buffer queue size: {self.buffer.qsize()}")
-                        previous_qsize = current_qsize
-            
-            except Empty:
-                print('buffer is empty, entering exit steps')
-                # self.buffer.clear()
-                fd.close()
+                self.front_pipe_cam.send('terminate')
+                # self.start_event.set()
+                # self.camera_process.join()
                 self.active = False
-                # winmm.timeEndPeriod(1)
-                # break 
-        print('sink loop finished')
+
+            elif msg == 'init_params':
+                init_params = self.front_pipe_cam.recv()
+                self.back_pipe_gui.send(init_params)
+
+            elif isinstance(msg, dict):
+                self.front_pipe_cam.send(msg)
+                updated_cam_params = self.front_pipe_cam.recv()
+                print(f"Process: {self.name} received {updated_cam_params}")
+                if isinstance(updated_cam_params, dict):
+                    self.back_pipe_gui.send(updated_cam_params)
+
+        print('MessageRelay finished, exiting')
+
+
+
+        # self.init_videowriter()
+        # print(f"Process: {self.name}, ID: {self.pid} is starting...")
+        # # previous_qsize = -1
+        # fd = open('sink_frames_AQ_200.txt', 'w')
+        # # winmm = ctypes.WinDLL('winmm.dll')
+        # # winmm.timeBeginPeriod(1)
+        # while self.active:
+        #     frame = self.buffer.get() #blocking
+        #     if frame['image'].sum() > 0:
+        #         # print(f"got frame number {frame['index']}")
+        #         self.video_writer.write_frame(frame['image'])
+        #         fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+        #         # current_qsize = self.buffer.qsize()
+        #         # if current_qsize != previous_qsize:
+        #         #     print(f"Sink buffer queue size: {self.buffer.qsize()}")
+        #         #     previous_qsize = current_qsize
+        #     else:
+        #         fd.close()
+        #         self.video_writer.close()
+        #         self.active = False
+        #     # winmm.timeEndPeriod(1)
+        #     # break 
+
        
 
 
@@ -193,9 +158,18 @@ if __name__ == "__main__":
     #     t_prev = t
     #     timestamp_prev = frame['timestamp']
 
+
+    empty_img = np.zeros((height, width), dtype=np.uint8)
+    sentinel = np.array((0, 0, empty_img),
+                        dtype = np.dtype([
+                            ('index', int), 
+                            ('timestamp', np.float32),
+                            ('image', empty_img.dtype, empty_img.shape)
+                            ]))
+
     camera_constructor = partial(XimeaCamera, dev_id=0)
     
-    buffer = ArrayQueue(500)
+    buffer = ArrayQueue(100)
 
     # buffer = ModifiableRingBuffer(num_bytes=(width*height*500), 
     #                               t_refresh=1e-3)
@@ -208,20 +182,24 @@ if __name__ == "__main__":
                                    start_event=start_event,
                                    terminate_event=terminate_event,
                                    camera_constructor=camera_constructor,
-                                   buffer=buffer)
+                                   buffer=buffer,
+                                   sentinel=sentinel)
     
 
     # winmm = ctypes.WinDLL('winmm.dll')
     # winmm.timeBeginPeriod(1)
 
+    sink = SaveProcess(buffer=buffer)
 
     message_process.start()
+    sink.start()
+
+    time.sleep(5)
 
     front_pipe.send('start')
-    time.sleep(5)
-    sink = Sink(buffer=buffer)
-    sink.start()
-    time.sleep(10)
+    # time.sleep(5)
+
+    time.sleep(30)
     front_pipe.send('stop')
     time.sleep(2)
     front_pipe.send('terminate')
