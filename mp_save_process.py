@@ -31,45 +31,60 @@ class SaveProcess(Process):
         self.save_buffer = save_buffer
         self.start_event = start_event
         self.terminate_event = terminate_event
+
         self.active = True
 
     def get_params(self):
-        params = self.back_pipe_save.recv()
-        print('Received parameters')
-        for key, value in params.items():
-            setattr(self, key, value)
+        msg = self.back_pipe_save.recv()
+
+        if isinstance(msg, dict):
+            print(f'Process {self.name} received save parameters')
+            for attr, param in msg.items():
+                value = param['value']
+                setattr(self, attr, value)
+                print(attr, value)
+
+        elif isinstance(msg, str):
+            print(f'Process {self.name} received {msg} message')
+            self.terminate()
+
+    def terminate(self):
+        self.active = False
 
     def init_videowriter(self):
-
-        height = 488
-        width = 648
-        fps = 200
-
-        self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=height,
-                                                             width=width,
+        self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
+                                                             width=self.width,
                                                              codec='h264',
-                                                             fps=fps,
+                                                             fps=self.framerate,
                                                              q=10,
                                                              profile='high',
                                                              preset='ultrafast',
-                                                             filename='FFMPEG_H264_q10_200_mp_test3.mp4')
-        
+                                                             filename=self.filename)
+        print('VideoWriter initialised')
+
     def release_file(self):
         self.video_writer.close()
         # self.termination_event.set()
     
     def run(self):
+        print(f'Process {self.name} running')
         while not self.terminate_event.is_set():
             self.get_params()
+            if self.terminate_event.is_set():
+                break 
             self.init_videowriter()
-            while self.start_event.is_set():
+            fd = open('save_frames_AQ_250.txt', 'w')
+            while self.active:
                 frame = self.save_buffer.get()
                 if frame['image'].sum() > 0:
                     self.video_writer.write_frame(frame['image'])
+                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                 else: 
-                    self.video_writer.close()
+                    self.release_file()
+                    fd.close()
                     break
-        
+            print('File saving finished')
+
         print('SaveProcess finished, exiting')
 
 
