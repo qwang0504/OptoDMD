@@ -26,10 +26,6 @@ class MessageRelay(Process):
                  back_pipe_gui: connection.Connection,
                  front_pipe_cam: connection.Connection,
                  front_pipe_save: connection.Connection,
-                 camera_constructor: Callable[[int], Camera],
-                 display_buffer: ArrayQueue,
-                 save_buffer: ArrayQueue,
-                 sentinel_array: np.ndarray,
                  start_event,
                  terminate_event,
                  *args, **kwargs):
@@ -40,14 +36,9 @@ class MessageRelay(Process):
         self.front_pipe_cam = front_pipe_cam
         self.front_pipe_save = front_pipe_save
 
-        self.camera_constructor = camera_constructor
-        self.display_buffer = display_buffer
-        self.save_buffer = save_buffer
-
         self.start_event = start_event
         self.terminate_event = terminate_event
 
-        self.sentinel_array = sentinel_array
         self.camera_process = None
         self.active = True
 
@@ -60,27 +51,25 @@ class MessageRelay(Process):
             
             if msg == 'start_acquisition': 
                 self.front_pipe_cam.send('display')
-                time.sleep(0.5)
+                # time.sleep(0.5)
                 self.start_event.set()
 
             elif msg == 'stop_acquisition':
-                self.display_buffer.put(self.sentinel_array)
                 self.start_event.clear()
 
             elif msg == 'start_recording':
-                params = self.back_pipe_gui.recv()
-                self.front_pipe_save.send(params)
                 self.front_pipe_cam.send('save')
+                save_params = self.back_pipe_gui.recv()
+                self.front_pipe_save.send(save_params)
                 self.start_event.set()
 
             elif msg == 'stop_recording':
-                self.save_buffer.put(self.sentinel_array)
-                self.display_buffer.put(self.sentinel_array)
                 self.start_event.clear()                
 
             elif msg == 'terminate':
                 self.terminate_event.set()
                 self.front_pipe_cam.send('terminate')
+                self.front_pipe_save.send('terminate')
                 # self.start_event.set()
                 # self.camera_process.join()
                 self.active = False
@@ -126,117 +115,72 @@ class MessageRelay(Process):
        
 
 
-# def get_from_queue(buffer):
-#     while True:
-#         try:
-#             item = buffer.get(timeout=1)
-#             shape = item['image'].shape
-#             index = item['index']
-#             print(shape, index)
-#         except Empty:
-#             buffer.clear() #need to "flush" queues for process to join?
-#             break
-#     print('loop over')
+# if __name__ == "__main__":
+
+#     width = 648
+#     height = 488
+
+#     # cam = camera_constructor()
+#     # cam.start_acquisition()
+#     # cam.set_exposure(1000)
+#     # cam.set_framerate(200)
+#     # t_prev = time.perf_counter()
+#     # timestamp_prev = 0
+#     # for i in range(100):
+#     #     frame = cam.get_frame()
+#     #     mod_buffer.put(frame)
+#     #     t = time.perf_counter()
+#     #     print(frame['index'], 1/(frame['timestamp']-timestamp_prev), 1/(t-t_prev))
+#     #     t_prev = t
+#     #     timestamp_prev = frame['timestamp']
 
 
-if __name__ == "__main__":
+#     empty_img = np.zeros((height, width), dtype=np.uint8)
+#     sentinel = np.array((0, 0, empty_img),
+#                         dtype = np.dtype([
+#                             ('index', int), 
+#                             ('timestamp', np.float32),
+#                             ('image', empty_img.dtype, empty_img.shape)
+#                             ]))
 
-    width = 648
-    height = 488
-
-    # cam = camera_constructor()
-    # cam.start_acquisition()
-    # cam.set_exposure(1000)
-    # cam.set_framerate(200)
-    # t_prev = time.perf_counter()
-    # timestamp_prev = 0
-    # for i in range(100):
-    #     frame = cam.get_frame()
-    #     mod_buffer.put(frame)
-    #     t = time.perf_counter()
-    #     print(frame['index'], 1/(frame['timestamp']-timestamp_prev), 1/(t-t_prev))
-    #     t_prev = t
-    #     timestamp_prev = frame['timestamp']
-
-
-    empty_img = np.zeros((height, width), dtype=np.uint8)
-    sentinel = np.array((0, 0, empty_img),
-                        dtype = np.dtype([
-                            ('index', int), 
-                            ('timestamp', np.float32),
-                            ('image', empty_img.dtype, empty_img.shape)
-                            ]))
-
-    camera_constructor = partial(XimeaCamera, dev_id=0)
+#     camera_constructor = partial(XimeaCamera, dev_id=0)
     
-    buffer = ArrayQueue(100)
+#     buffer = ArrayQueue(100)
 
-    # buffer = ModifiableRingBuffer(num_bytes=(width*height*500), 
-    #                               t_refresh=1e-3)
+#     # buffer = ModifiableRingBuffer(num_bytes=(width*height*500), 
+#     #                               t_refresh=1e-3)
 
-    front_pipe, back_pipe = Pipe()
-    start_event = Event()
-    terminate_event = Event()
+#     front_pipe, back_pipe = Pipe()
+#     start_event = Event()
+#     terminate_event = Event()
 
-    message_process = MessageRelay(back_pipe_gui=back_pipe,
-                                   start_event=start_event,
-                                   terminate_event=terminate_event,
-                                   camera_constructor=camera_constructor,
-                                   buffer=buffer,
-                                   sentinel=sentinel)
+#     message_process = MessageRelay(back_pipe_gui=back_pipe,
+#                                    start_event=start_event,
+#                                    terminate_event=terminate_event,
+#                                    camera_constructor=camera_constructor,
+#                                    buffer=buffer,
+#                                    sentinel=sentinel)
     
 
-    # winmm = ctypes.WinDLL('winmm.dll')
-    # winmm.timeBeginPeriod(1)
+#     # winmm = ctypes.WinDLL('winmm.dll')
+#     # winmm.timeBeginPeriod(1)
 
-    sink = SaveProcess(buffer=buffer)
+#     sink = SaveProcess(buffer=buffer)
 
-    message_process.start()
-    sink.start()
+#     message_process.start()
+#     sink.start()
 
-    time.sleep(5)
+#     time.sleep(5)
 
-    front_pipe.send('start')
-    # time.sleep(5)
+#     front_pipe.send('start')
+#     # time.sleep(5)
 
-    time.sleep(30)
-    front_pipe.send('stop')
-    time.sleep(2)
-    front_pipe.send('terminate')
+#     time.sleep(30)
+#     front_pipe.send('stop')
+#     time.sleep(2)
+#     front_pipe.send('terminate')
 
-    message_process.join()
-    sink.join()
+#     message_process.join()
+#     sink.join()
 
-    # winmm.timeEndPeriod(1)
-
-
-
-    # buffer = ArrayQueue(500)
-
-    # cam = XimeaCamera(0)
-
-    # cam.set_framerate(250)
-    # cam.set_exposure(1000)
-
-    # cam.start_acquisition()
-    
-    # start = time.time()
-    # duration = 3
-
-    # frames = []
-    # while time.time() < start + duration: 
-    #     frame = cam.get_frame()
-    #     buffer.put(frame)
-    #     print(frame['index'])
-        
-    # p1 = Process(target=get_from_queue, args=(buffer,))
-    # p1.start()
-    # time.sleep(8)
-    # print(p1.is_alive())
-    # p1.join()
-    # print(p1.is_alive())
-
-    # try:
-    #     buffer.get(timeout=1)
-    # except Empty:
-    #     print('empty')
+#     # winmm.timeEndPeriod(1)
