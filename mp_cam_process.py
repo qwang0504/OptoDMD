@@ -16,7 +16,6 @@ from arrayqueues import ArrayQueue
 import ctypes
 from ximea.xiapi import Xi_error
 
-# TODO: link saving process to display process 
 # TODO: experiment with reusing threads 
 
 
@@ -24,11 +23,10 @@ class CameraProcess(Process):
     def __init__(self,
                  back_pipe_cam: connection.Connection,
                  camera_constructor: Callable[[int], Camera],
-                 start_event,
-                 terminate_event,
                  display_buffer: ArrayQueue,
                  save_buffer: ArrayQueue,
-                #  mode: str = 'display',
+                 start_event,
+                 terminate_event,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -48,18 +46,16 @@ class CameraProcess(Process):
             'framerate', 
             'exposure', 
             'gain', 
-            # 'offsetX', 
-            # 'offsetY', 
             'height', 
             'width'
         ]
         
     def init_cam(self):
         self.camera = self.camera_constructor()
-        # self.camera.set_framerate(250)
-        # self.camera.set_exposure(4000)
-        # self.camera.set_gain(5)
         
+        self.camera.set_framerate(200)
+        self.camera.set_exposure(2000)
+
         init_params = {}
     
         for attr in self.controls:
@@ -95,23 +91,16 @@ class CameraProcess(Process):
                                             'range': updated_range, 
                                             'increment': updated_increment}
             print('updated params from cam_process: ', updated_cam_params)
+            self.frame_interval = np.round(updated_cam_params['framerate']['value'] / 60) #display at 60 fps
             self.back_pipe_cam.send(updated_cam_params)
-            # print(self.camera.get_framerate(), 
-            #       self.camera.get_exposure(), 
-            #       self.camera.get_gain())
 
         elif isinstance(msg, str):
-            if msg == 'display':
-                self.mode = msg
-            elif msg == 'save':
-                self.mode = msg
-        
+            self.mode = msg
 
     def display_mode(self):
         self.start_acquisition()
-        time.sleep(0.5)
         self.previous_qsize = -1
-        # fd = open('cam_frames_AQ_200_display.txt', 'w')
+        fd = open('cam_frames_AQ_250_display.txt', 'w')
         while self.start_event.is_set():
             if self.back_pipe_cam.poll():
                 self.update()
@@ -119,7 +108,7 @@ class CameraProcess(Process):
                 frame = self.camera.get_frame()
                 if frame is not None:
                     self.display_buffer.put(frame)
-                    # fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
             
                 self.current_qsize = self.display_buffer.qsize()
                 if self.current_qsize != self.previous_qsize:
@@ -127,25 +116,35 @@ class CameraProcess(Process):
                     self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()
+        fd.close()
         self.mode = None
         print('Acquisition stopped, exiting display mode')
 
     def save_mode(self):
         self.start_acquisition()
-        self.previous_qsize = -1
-        # fs = open('cam_frames_AQ_200_save.txt', 'w')
+        # self.previous_qsize = -1
+        fs = open('cam_frames_AQ_250_save.txt', 'w')
+        fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
+        frame_count = 0
         while self.start_event.is_set():
             frame = self.camera.get_frame()
             if frame is not None:
+                frame_count += 1
                 self.save_buffer.put(frame)
-                self.display_buffer.put(frame)
-                # fs.write(f"{frame['index']}, {frame['timestamp']}\n")
+                fs.write(f"{frame['index']}, {frame['timestamp']}\n")
+                if frame_count >= self.frame_interval:
+                # if frame_count % 10 == 0:
+                    self.display_buffer.put(frame)
+                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    frame_count = 0
             
-            self.current_qsize = self.save_buffer.qsize()
-            if self.current_qsize != self.previous_qsize:
-                print(f'save buffer queue size: {self.current_qsize}')
-                self.previous_qsize = self.current_qsize
+            # self.current_qsize = self.save_buffer.qsize()
+            # if self.current_qsize != self.previous_qsize:
+            #     print(f'save buffer queue size: {self.current_qsize}')
+            #     self.previous_qsize = self.current_qsize
         self.stop_acquisition()
+        fs.close()
+        fd.close()
         self.mode = None
         print('Acquisition stopped, exiting save mode')
 
@@ -162,7 +161,6 @@ class CameraProcess(Process):
             elif self.mode == 'save':
                 self.save_mode()
             elif self.mode == None:
-                print(self.display_buffer.qsize())
                 continue
             else: 
                 break
@@ -372,6 +370,25 @@ class DoubleBufferRelay:
     
 
     
+# controls = ['framerate', 'exposure', 'gain', 'height', 'width']
+# params = {}
+# for attr in controls:
+#     value = getattr(cam, 'get_' + attr)()   
+#     range = getattr(cam, 'get_' + attr + '_range')()
+#     increment = getattr(cam, 'get_' + attr + '_increment')()
+#     params[attr] = {'value': value,
+#                     'range': range,
+#                     'increment': increment}
+
+# start = time.time()
+# duration = 5
+# frames1 =  open('phase2.txt', 'w')
+# cam.start_acquisition()
+# while time.time() < start + duration:
+#     frame = cam.get_frame()
+#     frames1.write(f"{frame['index']}, {frame['timestamp']}\n")
+# frames1.close()
+# cam.stop_acquisition()
 
 
 # if __name__ == "__main__":
