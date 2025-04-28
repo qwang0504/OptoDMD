@@ -16,9 +16,11 @@ from queue import Empty, Full
 import ctypes
 import copy 
 
-### TODO: check if it's better to reuse QThread with event.wait()
-### TODO: add high-res timers
-### TODO: add camera fields
+# TODO: check if it's better to reuse QThread with event.wait()
+# TODO: add high-res timers
+# TODO: add camera fields
+# TODO: kill buttons and camera changes while recording 
+# TODO: add safeguard for blank in file name input
 
 
 class DisplayWorker(QObject):
@@ -43,20 +45,15 @@ class DisplayWorker(QObject):
         # print(f'QThread ID: {int(QThread.currentThreadId())}')
         previous_qsize = -1
         while self.active:
-            # self.start_event.wait()
             current_qsize = self.display_buffer.qsize()
 
-            try:
-                self.frame = self.display_buffer.get() #blocking
-                if self.frame['image'].sum() > 0:
-                    self.frame_ready.emit()
-                else: 
-                    print('DisplayWorker received sentinel')
-                    self.terminate()
-            except Full:
-                print('Buffer full!')
-                continue
-
+            self.frame = self.display_buffer.get() #blocking
+            if self.frame['image'].sum() > 0:
+                self.frame_ready.emit()
+            else: 
+                print('DisplayWorker received sentinel')
+                self.terminate()
+            
             if current_qsize != previous_qsize:
                 print(f'Display buffer queue size: {current_qsize}')
                 previous_qsize = current_qsize
@@ -66,27 +63,21 @@ class DisplayWorker(QObject):
 
 class CameraWidget(QWidget):
     def __init__(self, 
-                 front_pipe_cam: connection.Connection,
-                 front_pipe_save: connection.Connection,
                  front_pipe_gui: connection.Connection,
                  display_buffer: ArrayQueue,
-                #  start_event: threading.Event,
-                 width,
-                 height,
+                 save_buffer: ArrayQueue,
                  sentinel_array: np.ndarray,
                  *args, 
                  **kwargs):
+        
         super().__init__(*args, **kwargs)
 
-        self.front_pipe_cam = front_pipe_cam
-        self.front_pipe_save = front_pipe_save
         self.front_pipe_gui = front_pipe_gui
 
         self.display_buffer = display_buffer
-        self.width = width
-        self.height = height
+        self.save_buffer = save_buffer
         self.sentinel_array = sentinel_array
-        # self.start_event = start_event
+
         self.worker = None
         self.qthread = None
 
@@ -223,7 +214,6 @@ class CameraWidget(QWidget):
             self.qthread = QThread()
             self.worker.moveToThread(self.qthread)
             self.qthread.started.connect(self.worker.run)
-            self.qthread.finished.connect(self.close_thread)
             self.qthread.start()
             self.front_pipe_gui.send('start_acquisition')
         else: 
@@ -231,12 +221,13 @@ class CameraWidget(QWidget):
 
     def stop_acquisition(self):
         self.front_pipe_gui.send('stop_acquisition')
+        self.display_buffer.put(self.sentinel_array)
+        self.close_thread()
         # self.event.clear()
 
     def start_recording(self):
-        # params = self.get_params()
-        self.front_pipe_gui.send('start_acquisition')
-        self.front_pipe_save.send('start_recording')
+        self.front_pipe_gui.send('start_recording')
+        self.front_pipe_gui.send(self.params)
         # self.front_pipe_save.send(params)
 
         if self.worker is None: 
@@ -245,59 +236,58 @@ class CameraWidget(QWidget):
             self.qthread = QThread()
             self.worker.moveToThread(self.qthread)
             self.qthread.started.connect(self.worker.run)
-            self.qthread.finished.connect(self.close_thread)
             self.qthread.start()
 
         else:
-            self.front_pipe_gui.send('start_acquisition')
-            self.front_pipe_save.send('start_recording')
+            self.front_pipe_gui.send('start_recording')
+            self.front_pipe_gui.send(self.params)
 
     def stop_recording(self):
-        self.front_pipe_gui.send('stop_acquisition')
-        self.front_pipe_save.send('stop_recording')
+        self.front_pipe_gui.send('stop_recording')
+        self.display_buffer.put(self.sentinel_array)
+        self.save_buffer.put(self.sentinel_array)
+        self.close_thread()
 
     def terminate(self):
         if self.worker:
             self.stop_acquisition()
             self.display_buffer.put(self.sentinel_array)
-            # self.start_event.set()
-            # self.close_thread()
-            self.worker = None
-            # self.qthread = None
-            self.front_pipe_cam.send('terminate')
-            self.front_pipe_save.send('terminate')
+            self.save_buffer.put(self.sentinel_array)
+            self.close_thread()
+            self.front_pipe_gui.send('terminate')
         else:
             print('DisplayWorker / QThread undefined, nothing to terminate')
-            self.front_pipe_cam.send('terminate')
-            self.front_pipe_save.send('terminate')
+            self.front_pipe_gui.send('terminate')
 
     def update_display(self):
-        self.camera_preview.setPixmap(NDarray_to_QPixmap(self.worker.frame['image']))
+        try:
+            self.camera_preview.setPixmap(NDarray_to_QPixmap(self.worker.frame['image']))
+        except AttributeError:
+            pass    
 
     def set_exposure(self):
         msg = {'command': 'set_exposure', 'value': self.exposure_spinbox.value()}
         self.front_pipe_gui.send(msg)
-        self.params = self.front_pipe_gui.recv()
-        # print(msg)
+        updated_params = self.front_pipe_gui.recv()
+        self.params.update(updated_params)
         self.update_spinbox_values(self.params)
-        # print(self.params)
 
     def set_gain(self):
         msg = {'command': 'set_gain', 'value': self.gain_spinbox.value()}
         self.front_pipe_gui.send(msg)
-        self.params = self.front_pipe_gui.recv()
+        updated_params = self.front_pipe_gui.recv()
+        self.params.update(updated_params)
         self.update_spinbox_values(self.params)
-        # print(self.params)
 
     def set_framerate(self):
         msg = {'command': 'set_framerate', 'value': self.framerate_spinbox.value()}
         self.front_pipe_gui.send(msg)
-        self.params = self.front_pipe_gui.recv()
+        updated_params = self.front_pipe_gui.recv()
+        self.params.update(updated_params)
         self.update_spinbox_values(self.params)
-        # print(self.params)
 
     def set_filename(self):
-        self.params['filename'] = self.file_name_input.text() + '.mp4'
+        self.params['filename'] = {'value': self.file_name_input.text() + '.mp4'}
         self.file_name_input.clearFocus()
 
     def close_thread(self):
@@ -307,5 +297,6 @@ class CameraWidget(QWidget):
         self.worker = None
         print('qthread closed, defaults to None')
 
-    def closeEvent(self):
+    def closeEvent(self, event):
         self.terminate()
+        event.accept()  # Accept the event to close the window
