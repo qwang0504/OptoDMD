@@ -7,6 +7,7 @@ from mp_msg_relay import MessageRelay
 from camera_tools import XimeaCamera
 from functools import partial
 from mp_cam_process import CameraProcess
+from mp_save_process import SaveProcess
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 
@@ -23,8 +24,8 @@ if __name__ == "__main__":
     start_event = Event()
     terminate_event = Event()
 
-    display_buffer = ArrayQueue(500)
-    save_buffer = ArrayQueue(500)
+    display_buffer = ArrayQueue(200)
+    save_buffer = ArrayQueue(200)
 
     # create empty structured array as sentinel 
     empty_img = np.zeros((height, width), dtype=np.uint8)
@@ -37,36 +38,34 @@ if __name__ == "__main__":
 
     camera_constructor = partial(XimeaCamera, dev_id=0)
 
-    
     camera_process = CameraProcess(back_pipe_cam=back_pipe_cam,
                                    camera_constructor=camera_constructor,
-                                   start_event=start_event,
-                                   terminate_event=terminate_event,
                                    display_buffer=display_buffer,
-                                   save_buffer=save_buffer)
+                                   save_buffer=save_buffer,
+                                   start_event=start_event,
+                                   terminate_event=terminate_event)
     
     relay_process = MessageRelay(back_pipe_gui=back_pipe_gui,
                                  front_pipe_cam=front_pipe_cam,
                                  front_pipe_save=front_pipe_save,
-                                 camera_constructor=camera_constructor,
-                                 display_buffer=display_buffer,
-                                 save_buffer=save_buffer,
-                                 sentinel_array=sentinel,
                                  start_event=start_event,
                                  terminate_event=terminate_event)
+    
+    save_process = SaveProcess(back_pipe_save=back_pipe_save,
+                               save_buffer=save_buffer,
+                               start_event=start_event,
+                               terminate_event=terminate_event)
 
     camera_process.start()
     relay_process.start()
+    save_process.start()
 
     app = QApplication(sys.argv)
     
-    camera_widget = CameraWidget(front_pipe_cam=front_pipe_cam,
-                                 front_pipe_save=front_pipe_save,
-                                 front_pipe_gui=front_pipe_gui,
+    camera_widget = CameraWidget(front_pipe_gui=front_pipe_gui,
                                  display_buffer=display_buffer,
-                                 sentinel_array=sentinel,
-                                 width=width,
-                                 height=height)
+                                 save_buffer=save_buffer,
+                                 sentinel_array=sentinel)
     
     camera_widget.show()
 
@@ -74,4 +73,5 @@ if __name__ == "__main__":
 
     camera_process.join()
     relay_process.join()
+    save_process.join()
 
