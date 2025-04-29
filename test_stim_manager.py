@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
 from camera_tools import XimeaCamera
-from camera_widgets import CameraControl
+from old_code.camera_widgets import CameraControl
 
 import sys
 import numpy as np

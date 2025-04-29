@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import matplotlib
 import time
 matplotlib.use('Qt5Agg')
-from video_writer import OpenCV_VideoWriter
+from old_code.video_writer import OpenCV_VideoWriter
 
-from camera_widgets import CameraControl_MP, CameraControl
+from old_code.camera_widgets import CameraControl_MP, CameraControl
 from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD

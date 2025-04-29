@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import sys
 from PyQt5.QtWidgets import QApplication
 from camera_tools import XimeaCamera
-from camera_widgets import CameraControl
+from old_code.camera_widgets import CameraControl
 import time
 import cv2
 

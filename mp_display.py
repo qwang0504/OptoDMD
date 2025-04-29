@@ -19,7 +19,6 @@ import copy
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
 # TODO: add camera fields
-# TODO: add safeguard for blank in file name input
 
 
 class DisplayWorker(QObject):

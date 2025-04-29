@@ -1,5 +1,5 @@
 from camera_tools import XimeaCamera, Camera
-from camera_widgets import CameraControl
+from old_code.camera_widgets import CameraControl
 from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QMessageBox
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 from qt_widgets import NDarray_to_QPixmap

@@ -4,7 +4,7 @@ from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
 from camera_tools import XimeaCamera
-from camera_widgets import CameraControl
+from old_code.camera_widgets import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager

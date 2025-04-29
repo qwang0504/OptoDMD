@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButt
 from qt_widgets import LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, NDarray_to_QPixmap
 from camera_tools import Camera
 import numpy as np
-from video_writer import OpenCV_VideoWriter
+from old_code.video_writer import OpenCV_VideoWriter
 import cv2 
 import time
 from pathlib import Path
