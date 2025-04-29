@@ -19,7 +19,6 @@ import copy
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
 # TODO: add camera fields
-# TODO: kill buttons and camera changes while recording 
 # TODO: add safeguard for blank in file name input
 
 
@@ -157,15 +156,15 @@ class CameraWidget(QWidget):
         self.file_name_input.returnPressed.connect(self.set_filename)
 
         self.start_button = QPushButton(self)
-        self.start_button.setText('Start')
+        self.start_button.setText('Start acquisition')
         self.start_button.clicked.connect(self.start_acquisition)
 
         self.stop_button = QPushButton(self)
-        self.stop_button.setText('Stop')
+        self.stop_button.setText('Stop acquisition')
         self.stop_button.clicked.connect(self.stop_acquisition)
 
         self.record_button = QPushButton(self)
-        self.record_button.setText('Record')
+        self.record_button.setText('Record to file')
         self.record_button.clicked.connect(self.start_recording)
 
         self.stop_record_button = QPushButton(self)
@@ -216,13 +215,19 @@ class CameraWidget(QWidget):
             self.qthread.started.connect(self.worker.run)
             self.qthread.start()
             self.front_pipe_gui.send('start_acquisition')
+            self.acquisition_disabled()
+
         else: 
             self.front_pipe_gui.send('start_acquisition')
+            self.acquisition_disabled()
+
 
     def stop_acquisition(self):
         self.front_pipe_gui.send('stop_acquisition')
         self.display_buffer.put(self.sentinel_array)
         self.close_thread()
+        self.acquisition_enabled()
+
         # self.event.clear()
 
     def start_recording(self):
@@ -237,16 +242,20 @@ class CameraWidget(QWidget):
             self.worker.moveToThread(self.qthread)
             self.qthread.started.connect(self.worker.run)
             self.qthread.start()
+            self.record_disabled()
 
         else:
             self.front_pipe_gui.send('start_recording')
             self.front_pipe_gui.send(self.params)
+            self.record_disabled()
+
 
     def stop_recording(self):
         self.front_pipe_gui.send('stop_recording')
         self.display_buffer.put(self.sentinel_array)
         self.save_buffer.put(self.sentinel_array)
         self.close_thread()
+        self.record_enabled()
 
     def terminate(self):
         if self.worker:
@@ -287,8 +296,39 @@ class CameraWidget(QWidget):
         self.update_spinbox_values(self.params)
 
     def set_filename(self):
-        self.params['filename'] = {'value': self.file_name_input.text() + '.mp4'}
-        self.file_name_input.clearFocus()
+        if self.file_name_input.text() == "":
+            self.params['filename'] = {'value': 'test' + '.mp4'}
+        else:
+            self.params['filename'] = {'value': self.file_name_input.text() + '.mp4'}
+            self.file_name_input.clearFocus()
+
+    def acquisition_disabled(self):
+        self.start_button.setEnabled(False)
+        self.record_button.setEnabled(False)
+        self.stop_record_button.setEnabled(False)
+
+    def acquisition_enabled(self):
+        self.start_button.setEnabled(True)
+        self.record_button.setEnabled(True)
+        self.stop_record_button.setEnabled(True)
+        
+    def record_disabled(self):
+        self.record_button.setEnabled(False)
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.exposure_spinbox.setEnabled(False)
+        self.gain_spinbox.setEnabled(False)
+        self.framerate_spinbox.setEnabled(False)
+        self.file_name_input.setEnabled(False)
+        
+    def record_enabled(self):
+        self.record_button.setEnabled(True)
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(True)
+        self.exposure_spinbox.setEnabled(True)
+        self.gain_spinbox.setEnabled(True)
+        self.framerate_spinbox.setEnabled(True)
+        self.file_name_input.setEnabled(True)
 
     def close_thread(self):
         self.qthread.quit()
