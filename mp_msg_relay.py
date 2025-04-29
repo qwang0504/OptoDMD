@@ -1,24 +1,8 @@
-from camera_tools import XimeaCamera, Camera
-import sys
-import numpy as np
-import json
-import psutil
-from ipc_tools import RingBuffer, Logger, ModifiableRingBuffer
-import multiprocessing
 from multiprocessing import Process, Pipe, Queue, connection, Event
-# from multiprocessing.synchronize import Event
-from functools import partial
-from typing import Callable
 import time
 from queue import Empty
-import logging
-# from video_writer import OpenCV_VideoWriter
-from video_tools import OpenCV_VideoWriter, FFMPEG_VideoWriter_CPU_Grayscale
-import matplotlib.pyplot as plt
-import cv2
 from arrayqueues import ArrayQueue
-import ctypes
-from mp_save_process import SaveProcess
+# from ipc_tools import RingBuffer, Logger, ModifiableRingBuffer
 
 
 class MessageRelay(Process):
@@ -51,7 +35,6 @@ class MessageRelay(Process):
             
             if msg == 'start_acquisition': 
                 self.front_pipe_cam.send('display')
-                # time.sleep(0.5)
                 self.start_event.set()
 
             elif msg == 'stop_acquisition':
@@ -81,7 +64,7 @@ class MessageRelay(Process):
             elif isinstance(msg, dict):
                 self.front_pipe_cam.send(msg)
                 updated_cam_params = self.front_pipe_cam.recv()
-                print(f"Process: {self.name} received {updated_cam_params}")
+                # print(f"Process: {self.name} received {updated_cam_params}")
                 if isinstance(updated_cam_params, dict):
                     self.back_pipe_gui.send(updated_cam_params)
 

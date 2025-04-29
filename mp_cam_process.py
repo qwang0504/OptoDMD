@@ -90,7 +90,6 @@ class CameraProcess(Process):
                 updated_cam_params[attr] = {'value': updated_value, 
                                             'range': updated_range, 
                                             'increment': updated_increment}
-            print('updated params from cam_process: ', updated_cam_params)
             self.frame_interval = np.round(updated_cam_params['framerate']['value'] / 60) #display at 60 fps
             self.back_pipe_cam.send(updated_cam_params)
 
@@ -201,8 +200,8 @@ class CameraProcessThreads(Process):
         self.camera.set_exposure(4800)
         self.camera.set_framerate(200)
         self.camera.set_gain(7.4)
-        print(f'Exposure: {self.camera.get_exposure()}') #exposure time in microseconds
-        print(f'Frame rate: {self.camera.get_framerate()}')
+        # print(f'Exposure: {self.camera.get_exposure()}') #exposure time in microseconds
+        # print(f'Frame rate: {self.camera.get_framerate()}')
 
     def run(self):
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
