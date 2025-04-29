@@ -3,7 +3,8 @@ from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 from daq import LabJackU3LV, LabJackU3LV_new
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
-from camera_tools import XimeaCamera
+from camera_tools import XimeaCamera, CameraControl
+# from camera_tools import CameraControl, OpenCV_Webcam
 from old_code.camera_widgets import CameraControl
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
@@ -16,18 +17,6 @@ from image_tools import DrawPolyMask
 import json
 
 from multiprocessing import Process, Pipe, Queue 
-
-class CamGUIProcess(Process):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def run(self):
-        app = QApplication(sys.argv)
-        cam = XimeaCamera(0)
-        camera_controls = CameraControl(cam)
-        camera_controls.show()
-        app.exec()
 
 
 if __name__ == "__main__":
@@ -123,3 +112,4 @@ if __name__ == "__main__":
     app.exec()
 
     twop_sender.stop()
+

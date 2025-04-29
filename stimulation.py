@@ -18,11 +18,7 @@ class StimManager(QWidget):
     def __init__(
             self,
             mask_manager : MaskManager,
-            led_driver: LEDDriver,
-            protocol: str, 
-            cam_host: str,
-            stim_port: int,
-            # cam_port: int,  
+            led_driver: LEDDriver, 
             *args, **kwargs
             ):
     
@@ -44,9 +40,9 @@ class StimManager(QWidget):
         self.create_components()
         self.layout_components()
         
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.PUB)
-        self.socket.bind(protocol + '*:' + str(stim_port))
+        # self.context = zmq.Context()
+        # self.socket = self.context.socket(zmq.PUB)
+        # self.socket.bind(protocol + '*:' + str(stim_port))
 
     # def receive_message(self):
     #     message = self.start_stim_socket.recv_string()

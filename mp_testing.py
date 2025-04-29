@@ -8,6 +8,7 @@ from camera_tools import XimeaCamera
 from functools import partial
 from mp_cam_process import CameraProcess
 from mp_save_process import SaveProcess
+from stimulation import StimManager
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 

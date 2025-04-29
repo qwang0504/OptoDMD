@@ -518,6 +518,21 @@ if __name__ == "__main__":
     # Start the Qt event loop   
     sys.exit(app.exec())
 
+    camera_constructor = partial()
+    cam = camera_constructor()
+    cam.start_acquisition()
+    cam.set_exposure(1000)
+    cam.set_framerate(250)
+    t_prev = time.perf_counter()
+    timestamp_prev = 0
+    for i in range(100):
+        frame = cam.get_frame()
+        mod_buffer.put(frame)
+        t = time.perf_counter()
+        print(frame['index'], 1/(frame['timestamp']-timestamp_prev), 1/(t-t_prev))
+        t_prev = t
+        timestamp_prev = frame['timestamp']
+
     ## define the camera before the run() method as an initialise() method, also implement some cleanup after while loops
     ## probably define cameras within the worker threads 
     ## numpy.shape by default is (height, width)
