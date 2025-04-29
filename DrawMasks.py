@@ -102,8 +102,10 @@ class DrawPolyMaskOpto(QWidget):
         flat = np.zeros(self.get_image_size(), dtype=np.float32)
         masks = self.get_masks()
         for key, mask_tuple in masks.items():
-            mask = mask_tuple[1]
-            flat += mask
+            checked, mask = mask_tuple
+            if checked:
+            # mask = mask_tuple[1]
+                flat += mask
         flat = np.clip(flat,0,1)
 
         # store flat mask
