@@ -19,9 +19,9 @@ import json
 if __name__ == "__main__":
 
     # zmq settings
-    PROTOCOL = "tcp://"
-    HOST = "o1-317"
-    PORT = 5555
+    PROTOCOL = "tcp://" #upd, ipc 
+    HOST = "o1-317"  #'localhost'
+    PORT = 5555 #above 1024 
     
     # dmd settings
     SCREEN_DMD = 1

@@ -60,6 +60,10 @@ class DisplayWorker(QObject):
 
 
 class CameraWidget(QWidget):
+
+    record_started = pyqtSignal(int)
+    record_stopped = pyqtSignal(int)
+
     def __init__(self, 
                  front_pipe_gui: connection.Connection,
                  display_buffer: ArrayQueue,
@@ -177,7 +181,6 @@ class CameraWidget(QWidget):
         self.camera_preview = QLabel(self)
         self.camera_preview.setFixedSize(self.init_params['width']['value'], self.init_params['height']['value'])
 
-
     def layout_components(self):
         layout_start_stop = QHBoxLayout()
         layout_start_stop.addWidget(self.start_button)
@@ -220,19 +223,15 @@ class CameraWidget(QWidget):
             self.front_pipe_gui.send('start_acquisition')
             self.acquisition_disabled()
 
-
     def stop_acquisition(self):
         self.front_pipe_gui.send('stop_acquisition')
         self.display_buffer.put(self.sentinel_array)
         self.close_thread()
         self.acquisition_enabled()
 
-        # self.event.clear()
-
     def start_recording(self):
         self.front_pipe_gui.send('start_recording')
         self.front_pipe_gui.send(self.params)
-        # self.front_pipe_save.send(params)
 
         if self.worker is None: 
             self.worker = DisplayWorker(display_buffer=self.display_buffer)
@@ -247,7 +246,6 @@ class CameraWidget(QWidget):
             self.front_pipe_gui.send('start_recording')
             self.front_pipe_gui.send(self.params)
             self.record_disabled()
-
 
     def stop_recording(self):
         self.front_pipe_gui.send('stop_recording')

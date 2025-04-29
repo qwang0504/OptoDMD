@@ -26,28 +26,12 @@ class StimManager(QWidget):
 
         self.mask_manager = mask_manager
 
-        # self.message_receiver = MessageReceiver(stim_manager=self, 
-        #                                         protocol=protocol,
-        #                                         cam_host=cam_host)
-
         self.led_driver = led_driver
         self.mask_manager.draw_complete.connect(self.update_draw_display)
         self.thread_pool = QThreadPool()
 
-        # self.message_threadpool = QThreadPool()
-        # self.message_threadpool.start(self.message_receiver)
-
         self.create_components()
         self.layout_components()
-        
-        # self.context = zmq.Context()
-        # self.socket = self.context.socket(zmq.PUB)
-        # self.socket.bind(protocol + '*:' + str(stim_port))
-
-    # def receive_message(self):
-    #     message = self.start_stim_socket.recv_string()
-    #     if message == "START_STIMULATION":
-    #         self.start()
 
     def update_draw_display(self, signal: int):
         print(signal)
@@ -65,10 +49,12 @@ class StimManager(QWidget):
     
     # only gets masks that are checked in the main window 
     def get_checked_masks(self):
+        mask_widgets_checked = {}
         for key in self.mask_keys:
             mask_widget = self.mask_widgets[key]
             if mask_widget.show.checkState() == Qt.Checked:
-                self.mask_widgets_checked[key] = mask_widget
+                mask_widgets_checked[key] = mask_widget
+                self.mask_widgets_checked = mask_widgets_checked
 
     def create_components(self):
         self.rep_spinbox = LabeledSpinBox(self)
