@@ -1,6 +1,6 @@
 import multiprocessing
 from camera_tools import XimeaCamera, Camera
-from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QLineEdit
+from PyQt5.QtWidgets import QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QFileDialog
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 from qt_widgets import NDarray_to_QPixmap, LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, LabeledEditLine
 import numpy as np
@@ -15,10 +15,12 @@ import time
 from queue import Empty, Full
 import ctypes
 import copy 
+from datetime import datetime
+from pathlib import Path
 
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
-# TODO: add camera fields
+# TODO: link terminate to StimManager
 
 
 class DisplayWorker(QObject):
@@ -63,6 +65,7 @@ class CameraWidget(QWidget):
 
     record_started = pyqtSignal(int)
     record_stopped = pyqtSignal(int)
+    terminate_pressed = pyqtSignal()
 
     def __init__(self, 
                  front_pipe_gui: connection.Connection,
@@ -92,6 +95,9 @@ class CameraWidget(QWidget):
             'height', 
             'width'
         ]
+
+        self.output_dir = None
+        self.fish_number = None
 
         self.declare_components()
         self.layout_components()
@@ -175,11 +181,33 @@ class CameraWidget(QWidget):
         self.stop_record_button.clicked.connect(self.stop_recording)
 
         self.terminate_button = QPushButton(self)
-        self.terminate_button.setText('Terminate')
+        self.terminate_button.setText('Terminate all processes')
         self.terminate_button.clicked.connect(self.terminate)
 
         self.camera_preview = QLabel(self)
         self.camera_preview.setFixedSize(self.init_params['width']['value'], self.init_params['height']['value'])
+
+        self.automate_checkbox = QCheckBox('Automated mode', self)
+        self.automate_checkbox.setCheckState(False)
+        self.automate_checkbox.stateChanged.connect(self.toggle_widgets)
+
+        self.output_directory_button = QPushButton('Select video output directory')
+        self.output_directory_button.clicked.connect(self.select_directory) 
+        
+        self.directory_label = QLabel(self)
+        self.directory_label.setText('Directory selected: ')
+
+        self.fish_number_spinbox = LabeledSpinBox(self)
+        self.fish_number_spinbox.setText('Fish number')
+        self.fish_number_spinbox.setValue(0)
+        self.fish_number_spinbox.setSingleStep(1)
+        self.fish_number_spinbox.setRange(0,99)
+        self.fish_number_spinbox.valueChanged.connect(self.set_fish_number)
+        self.fish_number_spinbox.hide()
+
+        self.generate_folder_button = QPushButton('Generate fish folder')
+        self.generate_folder_button.clicked.connect(self.generate_fish_folder)
+        self.generate_folder_button.hide()
 
     def layout_components(self):
         layout_start_stop = QHBoxLayout()
@@ -261,9 +289,11 @@ class CameraWidget(QWidget):
             self.save_buffer.put(self.sentinel_array)
             self.close_thread()
             self.front_pipe_gui.send('terminate')
+            self.terminate_pressed.emit()
         else:
             print('DisplayWorker / QThread undefined, nothing to terminate')
             self.front_pipe_gui.send('terminate')
+            self.terminate_pressed.emit()
 
     def update_display(self):
         try:
@@ -326,6 +356,50 @@ class CameraWidget(QWidget):
         self.gain_spinbox.setEnabled(True)
         self.framerate_spinbox.setEnabled(True)
         self.file_name_input.setEnabled(True)
+
+    def toggle_widgets(self):
+        if self.automate_checkbox.isChecked():
+            self.fish_number_spinbox.show()
+            self.generate_folder_button.show()
+            
+        else:
+            self.fish_number_spinbox.hide()
+            self.generate_folder_button.hide()
+
+    def select_directory(self):
+        self.output_dir = QFileDialog.getExistingDirectory(self, 'Select output directory')
+        self.directory_label.setText(f'Selected directory: {str(self.output_dir)}')
+        self.params['output_dir'] = {'value': str(self.output_dir)}
+
+    def set_fish_number(self):
+        self.fish_number = self.fish_number_spinbox.value()
+    
+    def generate_fish_folder(self):
+        if self.output_dir and self.fish_number:
+            date = datetime.today().strftime('%Y%m%d')
+            self.fish_id = date + f'{self.fish_number:03}'
+            self.fish_folder = Path(self.output_dir, self.fish_id)
+            
+            if not self.fish_folder.exists():
+                self.fish_folder.mkdir(parents=True)
+                print(f'Fish folder {str(self.fish_folder)} created')
+                self.params['fish_id'] = {'value': str(self.fish_id)}
+            else:
+                print(f'Fish folder {self.fish_id} already exists')
+                self.params['fish_id'] = {'value': str(self.fish_id)}
+
+        else:
+            print('No output directory or fish number')
+
+    def set_trial_index(self, trial_index):
+        self.trial_index = trial_index
+        self.params['trial_index'] = {'value': self.trial_index}
+
+    def trial_started(self):
+        self.start_recording()
+    
+    def trial_ended(self):
+        self.stop_recording()
 
     def close_thread(self):
         self.qthread.quit()
