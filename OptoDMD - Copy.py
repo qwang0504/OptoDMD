@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
     try:
-        with open('calibration_3x/calibration.json', 'r') as f:
+        with open('Calibration_3x/calibration.json', 'r') as f:
             calibration = json.load(f)
 
         # 0: cam, 1: dmd, 2: twop
