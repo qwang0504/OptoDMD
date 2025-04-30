@@ -16,7 +16,11 @@ import cv2
 from arrayqueues import ArrayQueue
 import ctypes
 from video_tools import FFMPEG_VideoWriter_CPU_Grayscale
+from pathlib import Path
 
+# TODO: revisit q-value 
+# TODO: metadata structure 
+# TODO: update output directory handling 
 
 class SaveProcess(Process):
     def __init__(self, 
@@ -32,6 +36,7 @@ class SaveProcess(Process):
         self.start_event = start_event
         self.terminate_event = terminate_event
 
+        self.fish_id = None
         self.active = True
 
     def get_params(self):
@@ -46,24 +51,38 @@ class SaveProcess(Process):
 
         elif isinstance(msg, str):
             print(f'Process {self.name} received {msg} message')
-            self.terminate()
+            if msg == 'terminate':
+                self.terminate()
 
     def terminate(self):
         self.active = False
 
     def init_videowriter(self):
-        self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
-                                                             width=self.width,
-                                                             codec='h264',
-                                                             fps=self.framerate,
-                                                             q=10,
-                                                             profile='high',
-                                                             preset='ultrafast',
-                                                             filename=self.filename)
+        if self.fish_id == None:
+            self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
+                                                                width=self.width,
+                                                                codec='h264',
+                                                                fps=self.framerate,
+                                                                q=10,
+                                                                profile='high',
+                                                                preset='ultrafast',
+                                                                filename=self.filename)
+        else: 
+            self.filename = self.filename + self.trial_index 
+            self.video_path = Path(self.output_dir, self.fish_id, self.filename)
+            self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
+                                                                 width=self.width,
+                                                                 codec='h264',
+                                                                 fps=self.framerate,
+                                                                 q=10,
+                                                                 profile='high',
+                                                                 preset='ultrafast',
+                                                                 filename=self.video_path)
         print('VideoWriter initialised')
 
     def release_file(self):
         self.video_writer.close()
+        self.video_writer = None
         # self.termination_event.set()
     
     def run(self):
