@@ -7,6 +7,14 @@ from daq import LabJackU3LV, LabJackU3LV_new, DigitalAnalogIO
 import time
 import numpy as np
 import zmq
+import copy
+
+# TODO: sync with other processes
+# TODO: think about if this needs to run on a separate process
+# TODO: command hierarchy and direction
+# TODO: splitting into videos and auto-naming 
+# TODO: Fix stopping / termination mid-stimulation 
+
 
 class StimManager(QWidget):
 
@@ -163,7 +171,7 @@ class StimManager(QWidget):
     def shuffle_order(self):
         if self.mask_widgets:
             # self.mask_keys = list(self.mask_widgets.keys())
-            mask_keys_copy = list(self.mask_keys.copy())
+            mask_keys_copy = list(copy.deepcopy(self.mask_keys)) 
             reps = self.rep_spinbox.value()
             if reps > 1:
                 mask_keys_copy = [key for key in mask_keys_copy for _ in range(reps)]
@@ -184,12 +192,12 @@ class StimManager(QWidget):
             print('No masks drawn!')
         # return self.shuffled_mask_list
     
-    def shuffle_no_consecutive(self, mask_list):
-        while True:
-            np.random.shuffle(mask_list)
-        # Check for consecutive duplicates
-            if all(mask_list[i] != mask_list[i + 1] for i in range(len(mask_list) - 1)):
-                return mask_list
+    # def shuffle_no_consecutive(self, mask_list):
+    #     while True:
+    #         np.random.shuffle(mask_list)
+    #     # Check for consecutive duplicates
+    #         if all(mask_list[i] != mask_list[i + 1] for i in range(len(mask_list) - 1)):
+    #             return mask_list
 
     def set_number_of_elements(self):
         if self.shuffled_mask_keys:
@@ -222,19 +230,23 @@ class StimManager(QWidget):
     def start(self):
         self.set_number_of_elements()
         self.start_stim = StartStim(stim_manager=self, 
-                               led_driver=self.led_driver) #insert parameters
-        self.start_stim.started = True
+                                    led_driver=self.led_driver) 
         self.thread_pool.start(self.start_stim)
 
     def stop(self):
-        self.start_stim.started = False
+        self.start_stim.active = False
 
 
-class FinishedSignal(QObject):
-    run_finished = pyqtSignal(int)
+class StimProtocolSignal(QObject):
+    protocol_started = pyqtSignal(int)
+    protocol_ended = pyqtSignal(int)
 
-class StartSignal(QObject):
-    stim_started = pyqtSignal(int)
+
+class TrialSignal(QObject):
+    trial_index = pyqtSignal(int)
+    trial_start = pyqtSignal(int)
+    trial_end = pyqtSignal(int)
+
 
 class StartStim(QRunnable):
 
@@ -245,62 +257,61 @@ class StartStim(QRunnable):
         
         super().__init__(*args, **kwargs)
 
-        self.started = False 
-        self.keepgoing = True
+        self.active = True 
         self.stim_manager = stim_manager
         self.led_driver = led_driver
-        self.finished_signal = FinishedSignal()
-        # self.start_signal = StartSignal()
-        self.finished_signal.run_finished.connect(self.stim_manager.run_complete)
-        # self.start_signal.connect(self.stim_manager.stim_started)
+        self.stim_protocol_signal = StimProtocolSignal()
+        self.trial_signal = TrialSignal()
+        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.run_complete)
+        # consider propagating signal from QRunnable to StimManager, which then connects to CameraWidget?
         
         self.pulse_start = np.zeros(self.stim_manager.n_elements)
         self.pulse_end = np.zeros(self.stim_manager.n_elements)
         self.pulse_duration = np.zeros(self.stim_manager.n_elements)
 
-
     def run(self):
-        if self.started == True: 
-            if self.stim_manager.shuffled_mask_keys:
-                for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
-                    # self.start_signal.emit(True)
-                    self.stim_manager.socket.send_string(str(i))
-                    self.stim_manager.socket.send_string("START_RECORDING")
-                    print('signal sent: ', time.time())
-                    print('index: ', i)
-                    time.sleep(2) #1s sleep at camera code already 
-                    # self.clear_dmd.emit()
-                    self.stim_manager.mask_expose.emit(key)
-                    print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                    time.sleep(1) #time.sleep given because sending command for mask exposure takes time
-                    self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
-                    time.sleep(self.stim_manager.recording_duration_input.value())
-                    self.stim_manager.socket.send_string('STOP_RECORDING')
-                    interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
-                    time.sleep(interval)
+        # if self.active:
+        if self.stim_manager.shuffled_mask_keys:
+            for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
+                self.trial_signal.trial_index.emit(i)
+                self.trial_signal.trial_start.emit(True)
+                print('trial start signal emitted: ', time.time())
+                print('trial index: ', i)
+                time.sleep(2) 
+                self.stim_manager.mask_expose.emit(key)
+                print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
+                time.sleep(1) #time.sleep given because sending command for mask exposure takes time
+                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
+                time.sleep(self.stim_manager.recording_duration_input.value())
+                self.trial_signal.trial_end.emit(True)
+                interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
+                time.sleep(interval)
 
-                    self.pulse_start[i] = self.led_driver.pulse_sender.time_start
-                    self.pulse_end[i] = self.led_driver.pulse_sender.time_end
-                    self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
+                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
+                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                if not self.active:
+                    break 
 
-            else: 
-                for key in self.stim_manager.mask_keys:
-                    # self.clear_dmd.emit()
-                    self.stim_manager.mask_expose.emit(key)
-                    print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                    time.sleep(1)
-                    self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
-                    time.sleep(self.stim_manager.interval_spinbox.value())
+        else: 
+            for key in self.stim_manager.mask_keys:
+                self.stim_manager.mask_expose.emit(key)
+                print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
+                time.sleep(1)
+                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
+                time.sleep(self.stim_manager.interval_spinbox.value())
 
-                    self.pulse_start[i] = self.led_driver.pulse_sender.time_start
-                    self.pulse_end[i] = self.led_driver.pulse_sender.time_end
-                    self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
-        
-            # additional 2s before automatically ending the recording 
-            time.sleep(2)
-        
-            self.finished_signal.run_finished.emit(True)
-            # self.stim_manager.socket.send_string("LAUNCH METADATA")
+                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
+                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
+                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                if not self.active:
+                    break 
+    
+        # additional 2s before automatically ending the recording 
+        time.sleep(2)
+    
+        self.stim_protocol_signal.protocol_ended.emit(True)
+        # self.stim_manager.socket.send_string("LAUNCH METADATA")
 
 
 # stim logger 
