@@ -96,21 +96,28 @@ class DrawPolyMaskOpto(QWidget):
         self.set_masks({})
         self.update_pixmap()
 
-    def on_mask_flatten(self):
+    def on_mask_flatten(self): 
         
         # flatten masks
         flat = np.zeros(self.get_image_size(), dtype=np.float32)
         masks = self.get_masks()
+        checked_keys = []
+        # only flatten checked / visible masks
         for key, mask_tuple in masks.items():
             checked, mask = mask_tuple
             if checked:
             # mask = mask_tuple[1]
                 flat += mask
+                checked_keys.append(key)
         flat = np.clip(flat,0,1)
+        flat_mask_key = max(masks.keys()) + 1
 
-        # store flat mask
-        masks = {}
-        masks[1] = (True, flat)
+        # remove checked masks
+        for key in checked_keys:
+            masks.pop(key, None)
+
+        # add flat mask as with max(key) + 1 as key
+        masks[flat_mask_key] = (True, flat)
         self.set_masks(masks)
 
         # update display
@@ -408,20 +415,41 @@ class MaskManager(QWidget):
         if self.mask_widgets:
 
             self.flatten_mask.emit()
-
-            # remove widgets
+            
+            # remove checked widgets
+            checked_keys = []
+            flat_mask_key = max(self.mask_widgets.keys()) + 1
             for key, widget in self.mask_widgets.items():
-                self.frame_layout.removeWidget(widget)
-                widget.deleteLater()
-            self.mask_widgets = {}
-
+                if widget.show.checkState() == Qt.Checked:
+                    checked_keys.append(key)
+                    self.frame_layout.removeWidget(widget)
+                    widget.deleteLater()
+            
+            for key in checked_keys:
+                self.mask_widgets.pop(key, None)
+            
             # update widget
-            widget = MaskItem(1, "flat")
+            widget = MaskItem(flat_mask_key, "flat")
             widget.showClicked.connect(self.on_mask_visibility)
             widget.deletePressed.connect(self.on_delete_mask)
             widget.maskExpose.connect(self.on_mask_expose)
             self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
-            self.mask_widgets[1] = widget
+            self.mask_widgets[flat_mask_key] = widget
+                
+
+            # # remove widgets
+            # for key, widget in self.mask_widgets.items():
+            #     self.frame_layout.removeWidget(widget)
+            #     widget.deleteLater()
+            # self.mask_widgets = {}
+
+            # # update widget
+            # widget = MaskItem(1, "flat")
+            # widget.showClicked.connect(self.on_mask_visibility)
+            # widget.deletePressed.connect(self.on_delete_mask)
+            # widget.maskExpose.connect(self.on_mask_expose)
+            # self.frame_layout.insertWidget(self.frame_layout.count()-1, widget)
+            # self.mask_widgets[1] = widget
 
     def drawing_complete(self):
         if self.mask_widgets:
