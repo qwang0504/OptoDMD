@@ -8,7 +8,10 @@ from camera_tools import XimeaCamera
 from functools import partial
 from mp_cam_process import CameraProcess
 from mp_save_process import SaveProcess
+from DrawMasks import MaskManager
 from stimulation import StimManager
+from LED import LEDD1B
+from metadata import Metadata
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 
@@ -68,6 +71,17 @@ if __name__ == "__main__":
                                  save_buffer=save_buffer,
                                  sentinel_array=sentinel)
     
+    stim_manager = StimManager()
+    metadata = Metadata()
+
+    # Connect signals and slots
+    stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
+    stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
+    stim_manager.trial_started.connect(camera_widget.start_recording)
+    stim_manager.trial_ended.connect(camera_widget.stop_recording)
+
+    stim_manager.launch_metadata.connect(metadata.initialise_widget)
+
     camera_widget.show()
 
     app.exec()
