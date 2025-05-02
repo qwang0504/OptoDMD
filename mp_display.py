@@ -191,7 +191,7 @@ class CameraWidget(QWidget):
         self.automate_checkbox.setCheckState(False)
         self.automate_checkbox.stateChanged.connect(self.toggle_widgets)
 
-        self.output_directory_button = QPushButton('Select video output directory')
+        self.output_directory_button = QPushButton('Select output directory')
         self.output_directory_button.clicked.connect(self.select_directory) 
         
         self.directory_label = QLabel(self)
@@ -208,6 +208,10 @@ class CameraWidget(QWidget):
         self.generate_folder_button = QPushButton('Generate fish folder')
         self.generate_folder_button.clicked.connect(self.generate_fish_folder)
         self.generate_folder_button.hide()
+
+        self.metadata_checkbox = QCheckBox('Trial metadata', self)
+        self.metadata_checkbox.setCheckState(True)
+        self.metadata_checkbox.stateChanged.connect(self.generate_metadata)
 
     def layout_components(self):
         layout_start_stop = QHBoxLayout()
@@ -258,6 +262,8 @@ class CameraWidget(QWidget):
         self.acquisition_enabled()
 
     def start_recording(self):
+        self.video_start_time = time.perf_counter_ns()
+        self.params['video_start_time'] = {'value': self.video_start_time}
         self.front_pipe_gui.send('start_recording')
         self.front_pipe_gui.send(self.params)
 
@@ -324,9 +330,9 @@ class CameraWidget(QWidget):
 
     def set_filename(self):
         if self.file_name_input.text() == "":
-            self.params['filename'] = {'value': 'test' + '.mp4'}
+            self.params['filename'] = {'value': 'test'}
         else:
-            self.params['filename'] = {'value': self.file_name_input.text() + '.mp4'}
+            self.params['filename'] = {'value': self.file_name_input.text()}
             self.file_name_input.clearFocus()
 
     def acquisition_disabled(self):
@@ -390,16 +396,20 @@ class CameraWidget(QWidget):
 
         else:
             print('No output directory or fish number')
+    
+    def set_stim_number(self, stim_number):
+        self.stim_number = stim_number
+        self.params['stim_number'] = {'value': self.stim_number}
 
     def set_trial_index(self, trial_index):
         self.trial_index = trial_index
         self.params['trial_index'] = {'value': self.trial_index}
 
-    def trial_started(self):
-        self.start_recording()
-    
-    def trial_ended(self):
-        self.stop_recording()
+    def generate_metadata(self):
+        if self.metadata_checkbox.isChecked:
+            self.params['metadata'] = {'value': True}
+        else: 
+            self.params['metadata'] = {'value': False}
 
     def close_thread(self):
         self.qthread.quit()
