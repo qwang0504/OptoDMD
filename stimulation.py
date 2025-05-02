@@ -11,18 +11,22 @@ import copy
 
 # TODO: sync with other processes
 # TODO: think about if this needs to run on a separate process
-# TODO: command hierarchy and direction
-# TODO: splitting into videos and auto-naming 
-# TODO: Fix stopping / termination mid-stimulation 
+# TODO: check if time.perf_counter_ns() / windows high-res timer works better
 
 
 class StimManager(QWidget):
 
     mask_expose = pyqtSignal(int)
     clear_dmd = pyqtSignal()
-    run_complete = pyqtSignal(int)
-    stim_started = pyqtSignal(int)
-    
+    run_complete = pyqtSignal()
+    stim_started = pyqtSignal()
+    stim_ended = pyqtSignal()
+    stim_number_set = pyqtSignal(int)
+    trial_index_set = pyqtSignal(int)
+    trial_started = pyqtSignal()
+    trial_ended = pyqtSignal()
+    launch_metadata = pyqtSignal()
+
     def __init__(
             self,
             mask_manager : MaskManager,
@@ -105,19 +109,20 @@ class StimManager(QWidget):
         self.stop_stim_button.setText('Stop stimulation')
         self.stop_stim_button.clicked.connect(self.stop)
 
-
         self.masks_display = QListWidget(self)
 
         self.fish_number_input = LabeledSpinBox(self)
         self.fish_number_input.setText('Fish number')
         self.fish_number_input.setRange(0, 999)
         self.fish_number_input.setSingleStep(1)
+        self.fish_number_input.setValue(0)
         self.fish_number_input.valueChanged.connect(self.set_fish_number)
         
         self.stim_number_input = LabeledSpinBox(self)
         self.stim_number_input.setText('Stimulation number')
         self.stim_number_input.setRange(0, 999)
         self.stim_number_input.setSingleStep(1)
+        self.stim_number_input.setValue(0)
         self.stim_number_input.valueChanged.connect(self.set_stim_number)
 
         self.recording_duration_input = LabeledSpinBox(self)
@@ -127,6 +132,8 @@ class StimManager(QWidget):
         self.recording_duration_input.setValue(10)
         # self.recording_duration_input.valueChanged.connect(self.set_recording_duration)
 
+        self.metadata_checkbox = QCheckBox('Stim protocol metadata', self)
+        self.metadata_checkbox.setCheckState(True)
 
     def layout_components(self):
         
@@ -192,12 +199,12 @@ class StimManager(QWidget):
             print('No masks drawn!')
         # return self.shuffled_mask_list
     
-    # def shuffle_no_consecutive(self, mask_list):
-    #     while True:
-    #         np.random.shuffle(mask_list)
-    #     # Check for consecutive duplicates
-    #         if all(mask_list[i] != mask_list[i + 1] for i in range(len(mask_list) - 1)):
-    #             return mask_list
+    def shuffle_no_consecutive(self, mask_list):
+        while True:
+            np.random.shuffle(mask_list)
+        # Check for consecutive duplicates
+            if all(mask_list[i] != mask_list[i + 1] for i in range(len(mask_list) - 1)):
+                return mask_list
 
     def set_number_of_elements(self):
         if self.shuffled_mask_keys:
@@ -215,8 +222,9 @@ class StimManager(QWidget):
         self.fish_number = f'{fish_number:03}' #adds leading zeros
 
     def set_stim_number(self):
-        stim_protocol_number = self.stim_number_input.value()
-        self.stim_number = str(stim_protocol_number)
+        self.stim_number = self.stim_number_input.value()
+        self.stim_folder = 'stim' + self.stim_number
+        self.stim_n.emit(self.stim_number)
 
     # def set_recording_duration(self):
     #     self.recording_duration = self.recording_duration_input.value()
@@ -236,16 +244,26 @@ class StimManager(QWidget):
     def stop(self):
         self.start_stim.active = False
 
+    def disable_widget(self):
+        self.setEnabled(False)
+
+    def enable_widget(self):
+        self.setEnabled(True)
+
+    def check_metadata(self):
+        if self.metadata_checkbox.isChecked():
+            self.launch_metadata.emit()
+
 
 class StimProtocolSignal(QObject):
-    protocol_started = pyqtSignal(int)
-    protocol_ended = pyqtSignal(int)
+    protocol_started = pyqtSignal()
+    protocol_ended = pyqtSignal()
 
 
 class TrialSignal(QObject):
     trial_index = pyqtSignal(int)
-    trial_start = pyqtSignal(int)
-    trial_end = pyqtSignal(int)
+    trial_start = pyqtSignal()
+    trial_end = pyqtSignal()
 
 
 class StartStim(QRunnable):
@@ -260,9 +278,14 @@ class StartStim(QRunnable):
         self.active = True 
         self.stim_manager = stim_manager
         self.led_driver = led_driver
+
         self.stim_protocol_signal = StimProtocolSignal()
         self.trial_signal = TrialSignal()
-        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.run_complete)
+
+        self.trial_signal.trial_index.connect(self.stim_manager.trial_index_set)
+        self.trial_signal.trial_start.connect(self.stim_manager.trial_started)
+        self.trial_signal.trial_end.connect(self.stim_manager.trial_ended)
+        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.check_metadata)
         # consider propagating signal from QRunnable to StimManager, which then connects to CameraWidget?
         
         self.pulse_start = np.zeros(self.stim_manager.n_elements)
@@ -273,17 +296,21 @@ class StartStim(QRunnable):
         # if self.active:
         if self.stim_manager.shuffled_mask_keys:
             for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
-                self.trial_signal.trial_index.emit(i)
-                self.trial_signal.trial_start.emit(True)
+                self.trial_signal.trial_index.emit(i+1) #1-based trial indexing
+                time.sleep(1) #give time to send trial index over to CameraWidget
+
+                self.trial_signal.trial_start.emit() #start_recording() triggered 
                 print('trial start signal emitted: ', time.time())
-                print('trial index: ', i)
-                time.sleep(2) 
+                print('trial index: ', i+1)
+                time.sleep(2) #start recording first before exposing mask and pulsing LED
+                
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
                 time.sleep(1) #time.sleep given because sending command for mask exposure takes time
+                
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.recording_duration_input.value())
-                self.trial_signal.trial_end.emit(True)
+                self.trial_signal.trial_end.emit()
                 interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
                 time.sleep(interval)
 
@@ -310,7 +337,7 @@ class StartStim(QRunnable):
         # additional 2s before automatically ending the recording 
         time.sleep(2)
     
-        self.stim_protocol_signal.protocol_ended.emit(True)
+        self.stim_protocol_signal.protocol_ended.emit()
         # self.stim_manager.socket.send_string("LAUNCH METADATA")
 
 
