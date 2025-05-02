@@ -75,6 +75,7 @@ if __name__ == "__main__":
     metadata = Metadata()
 
     # Connect signals and slots
+    camera_widget.terminate_pressed.connect(stim_manager.stop)
     stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
     stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
     stim_manager.trial_started.connect(camera_widget.start_recording)

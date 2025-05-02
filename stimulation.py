@@ -12,7 +12,7 @@ import copy
 # TODO: sync with other processes
 # TODO: think about if this needs to run on a separate process
 # TODO: check if time.perf_counter_ns() / windows high-res timer works better
-
+# TODO: update method without shuffle
 
 class StimManager(QWidget):
 
@@ -226,12 +226,6 @@ class StimManager(QWidget):
         self.stim_folder = 'stim' + self.stim_number
         self.stim_n.emit(self.stim_number)
 
-    # def set_recording_duration(self):
-    #     self.recording_duration = self.recording_duration_input.value()
-    
-    # def set_stim_duration(self):
-    #     self.stim_duration = self.duration_spinbox.value()
-
     def set_interval(self):
         self.interval = self.interval_spinbox.value()
 
@@ -317,6 +311,7 @@ class StartStim(QRunnable):
                 self.pulse_start[i] = self.led_driver.pulse_sender.time_start
                 self.pulse_end[i] = self.led_driver.pulse_sender.time_end
                 self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                
                 if not self.active:
                     break 
 
