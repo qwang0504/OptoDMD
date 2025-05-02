@@ -58,18 +58,13 @@ class SaveProcess(Process):
         self.active = False
 
     def init_videowriter(self):
-        if self.fish_id == None:
-            self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
-                                                                width=self.width,
-                                                                codec='h264',
-                                                                fps=self.framerate,
-                                                                q=10,
-                                                                profile='high',
-                                                                preset='ultrafast',
-                                                                filename=self.filename)
-        else: 
-            self.filename = self.filename + self.trial_index 
-            self.video_path = Path(self.output_dir, self.fish_id, self.filename)
+        if self.fish_id:
+            self.video_name = self.filename + self.trial_index 
+            self.stim_folder = 'stim' + str(self.stim_number)
+            self.video_path = str(Path(self.output_dir, 
+                                       self.stim_folder, 
+                                       self.fish_id, 
+                                       self.video_name))
             self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
                                                                  width=self.width,
                                                                  codec='h264',
@@ -77,14 +72,48 @@ class SaveProcess(Process):
                                                                  q=10,
                                                                  profile='high',
                                                                  preset='ultrafast',
-                                                                 filename=self.video_path)
+                                                                 filename=self.video_path + '.mp4')
+            
+        else:
+            self.video_name = self.filename 
+            self.video_path = str(Path(self.output_dir, self.video_name))
+            self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
+                                                                width=self.width,
+                                                                codec='h264',
+                                                                fps=self.framerate,
+                                                                q=10,
+                                                                profile='high',
+                                                                preset='ultrafast',
+                                                                filename=self.video_path + '.mp4')
+
         print('VideoWriter initialised')
 
     def release_file(self):
         self.video_writer.close()
         self.video_writer = None
         # self.termination_event.set()
-    
+
+    def generate_trial_metadata(self):
+        if self.metadata:
+            trial_metadata = {
+                'fish_id': self.fish_id,
+                'trial_index': self.trial_index,
+                'video_start': self.video_start_time,
+                'fps': self.framerate,
+                'exposure': self.exposure,
+                'gain': self.gain,
+                'frame_width': self.width, 
+                'frame_height': self.height, 
+                'codec': self.video_writer.codec, 
+                'q': self.video_writer.q,
+                'profile': self.video_writer.profile,
+                'video_filename': self.filename
+                }
+
+            metadata_path = Path(self.video_path +'.json')
+            with open(metadata_path, 'w') as file:
+                json.dump(trial_metadata, file)
+        
     def run(self):
         print(f'Process {self.name} running')
         while not self.terminate_event.is_set():
@@ -100,6 +129,7 @@ class SaveProcess(Process):
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                 else: 
                     self.release_file()
+                    self.generate_trial_metadata()
                     fd.close()
                     break
             print('File saving finished')
