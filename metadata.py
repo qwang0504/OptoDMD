@@ -3,19 +3,24 @@
 from stimulation import StimManager
 # from LED import LEDDriver
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QCalendarWidget, QFileDialog
-from PyQt5.QtCore import QDate
+from PyQt5.QtCore import QDate, pyqtSignal
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox
 from old_code.camera_widgets import CameraControl
 import json
 from pathlib import Path
 from datetime import datetime
 
+# check if time.perf_counter_ns() is system wide 
+
 class Metadata(QWidget):
+    
+    disable_widget = pyqtSignal()
+    enable_widget = pyqtSignal()
+    
     def __init__(
             self, 
             stim_manager: StimManager, 
             cam_controls: CameraControl,
-            # led_driver: LEDDriver,
             *args, 
             **kwargs
             ):
@@ -25,21 +30,23 @@ class Metadata(QWidget):
         self.stim_manager = stim_manager 
         self.cam_controls = cam_controls
         # self.led_driver = led_driver
+        self.disable_widget.connect(stim_manager.disable_widget)
+        self.enable_widget.connect(stim_manager.enable_widget)
 
         self.declare_components()
         self.layout_components()
 
-    def initialise_widget(self, signal: int):
-        if signal: 
-            self.show()
-            self.get_id()
-            self.get_video_settings()
-            self.get_interval()
-            self.get_directory()
-            self.get_mask_order()
-            self.get_interval()
-            self.get_pulse_timing()
-            self.get_led_params()
+    def initialise_widget(self):
+        self.show()
+        self.get_id()
+        self.get_video_settings()
+        self.get_interval()
+        self.get_directory()
+        self.get_mask_order()
+        self.get_interval()
+        self.get_pulse_timing()
+        self.get_led_params()
+        self.disable_widget.emit()
 
     def declare_components(self):
 
@@ -196,6 +203,9 @@ class Metadata(QWidget):
         with open(metadata_path, 'w') as file:
             json.dump(metadata_dict, file)
 
+    def closeEvent(self, event):
+        self.enable_widget.emit()
+        event.accept()
     #genotype, age, condition
     #mask exposed, pulse start, pulse end, duration, interval 
     #fps, exposure, gain, encoding, frame size, fourcc, filename, video start time
