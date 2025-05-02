@@ -1,11 +1,8 @@
-# import numpy as np
-# import pandas as pd
 from stimulation import StimManager
-# from LED import LEDDriver
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox, QLineEdit, QCalendarWidget, QFileDialog
 from PyQt5.QtCore import QDate, pyqtSignal
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox
-from old_code.camera_widgets import CameraControl
+from mp_display import CameraWidget
 import json
 from pathlib import Path
 from datetime import datetime
@@ -20,7 +17,7 @@ class Metadata(QWidget):
     def __init__(
             self, 
             stim_manager: StimManager, 
-            cam_controls: CameraControl,
+            camera_widget: CameraWidget,
             *args, 
             **kwargs
             ):
@@ -28,8 +25,8 @@ class Metadata(QWidget):
         super().__init__(*args, **kwargs)
 
         self.stim_manager = stim_manager 
-        self.cam_controls = cam_controls
-        # self.led_driver = led_driver
+        self.camera_widget = camera_widget
+
         self.disable_widget.connect(stim_manager.disable_widget)
         self.enable_widget.connect(stim_manager.enable_widget)
 
@@ -39,7 +36,8 @@ class Metadata(QWidget):
     def initialise_widget(self):
         self.show()
         self.get_id()
-        self.get_video_settings()
+        self.get_stim_number()
+        # self.get_video_settings()
         self.get_interval()
         self.get_directory()
         self.get_mask_order()
@@ -50,12 +48,6 @@ class Metadata(QWidget):
 
     def declare_components(self):
 
-        self.fish_number_input = QLineEdit(self)
-        self.fish_number_input.setText('Fish number (fn)')
-        self.fish_number_input.returnPressed.connect(self.set_fish_number)
-        self.fish_number_input_instructions = QLabel(self)
-        self.fish_number_input_instructions.setText('001, 002 etc.')
-        
         self.calendar = QCalendarWidget(self)
         self.calendar.setGridVisible(True)
         self.calendar.selectionChanged.connect(self.calculate_age)
@@ -81,11 +73,8 @@ class Metadata(QWidget):
         self.led_power_input.setSingleStep(0.5)
         self.led_power_input.valueChanged.connect(self.get_led_params)
 
-        # self.directory_button = QPushButton(self)
-        # self.directory_button.setText('Select directory')
-        # self.directory_button.clicked.connect(self.set_directory)
-        # self.directory_label = QLabel(self)
-        # self.directory_label.setText('Selected directory: ')
+        self.directory_label = QLabel(self)
+        self.directory_label.setText(f'Output directory: {self.output_dir}')
 
         self.export_metadata_button = QPushButton(self)
         self.export_metadata_button.setText('Export metadata')
@@ -111,10 +100,10 @@ class Metadata(QWidget):
     # gets today's date and time and formats it into YYYYmmDDHHMM
     # creates unique id with fish number 
     def get_id(self):
-        self.id = self.cam_controls.fish_id
+        self.id = self.camera_widget.fish_id
 
-    def set_fish_number(self):
-        self.fish_number = self.fish_number_input.text()
+    def get_stim_number(self):
+        self.stim_number = self.stim_manager.stim_number
     
     def set_fishline(self):
         self.fishline = self.fishline_input.text()
@@ -137,16 +126,6 @@ class Metadata(QWidget):
         self.dpf_label.setText(f'Days post-fertilisation: {self.age}')
         print(self.age)
 
-    def get_video_settings(self):
-        self.fps = self.cam_controls.camera.get_framerate()
-        self.exposure = self.cam_controls.camera.get_exposure()
-        self.gain = self.cam_controls.camera.get_gain()
-        self.width = self.cam_controls.camera.get_width()
-        self.height = self.cam_controls.camera.get_height()
-        self.fourcc = self.cam_controls.sender.fourcc
-        self.video_filename = self.cam_controls.sender.filename
-        self.video_start_time = self.cam_controls.sender.video_start_time 
-
     def get_interval(self):
         self.interval = self.stim_manager.interval_spinbox.value()
 
@@ -168,26 +147,20 @@ class Metadata(QWidget):
         self.duty_cycle = self.stim_manager.led_driver.intensity
         
     def get_directory(self):
-        self.directory = self.cam_controls.fish_dir
+        self.output_dir = self.camera_widget.output_dir
+        self.stim_folder_name = 'stim' + self.stim_number
+        self.stim_folder_path = Path(self.output_dir, self.stim_folder_name)
         # self.directory = QFileDialog.getExistingDirectory(self, "Select Directory")
         # if self.directory: 
         #     self.directory_label.setText(f'Selected directory: {self.directory}')
 
     def export_metadata(self):
-        metadata_dict = {
+        stim_metadata = {
             'fish_id': self.id, 
             'line': self.fishline,
             'condition': self.condition, 
             'dob': self.dob, 
             'age': self.age, 
-            'fps': self.fps, 
-            'exposure': self.exposure, 
-            'gain': self.gain, 
-            'frame_width': self.width, 
-            'frame_height': self.height, 
-            'fourcc': self.fourcc, 
-            'video_filename': self.video_filename,
-            'video_start': self.video_start_time, 
             'interval': self.interval, 
             'mask_order': self.mask_order, 
             'led_power': self.led_power, 
@@ -198,10 +171,10 @@ class Metadata(QWidget):
             'pulse_duration': list(self.pulse_duration)
         }
 
-        metadata_path = Path(self.directory, self.video_filename+'.json')
+        metadata_path = Path(self.stim_folder_path, self.stim_folder_name + '.json')
 
         with open(metadata_path, 'w') as file:
-            json.dump(metadata_dict, file)
+            json.dump(stim_metadata, file)
 
     def closeEvent(self, event):
         self.enable_widget.emit()
@@ -217,7 +190,7 @@ class Metadata(QWidget):
 class CameraMetadata(QWidget):
     def __init__(
             self, 
-            cam_controls: CameraControl,
+            cam_controls: CameraWidget,
             *args, 
             **kwargs
             ):
