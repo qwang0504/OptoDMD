@@ -13,6 +13,11 @@ from stimulation import StimManager
 from LED import LEDD1B
 from metadata import Metadata
 import numpy as np
+import json
+from daq import LabJackU3LV_new
+from LED import LEDWidget, LEDD1B
+from DMD import DMD
+from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 from PyQt5.QtWidgets import QApplication
 
 
@@ -20,6 +25,34 @@ if __name__ == "__main__":
 
     height = 488
     width = 648
+
+    PROTOCOL = "ipc://"
+    HOST = "localhost"
+    PORT = 5000
+
+    # dmd settings
+    SCREEN_DMD = 1
+    DMD_HEIGHT = 1140
+    DMD_WIDTH = 912
+
+    # labjack settingss
+    PWM_CHANNEL = 6
+    
+    # calibration file
+    transformations = np.tile(np.eye(3), (3,3,1,1))
+    try:
+        with open('calibration_4x/calibration.json', 'r') as f:
+            calibration = json.load(f)
+
+        # 0: cam, 1: dmd, 2: twop
+        transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
+        transformations[0,2] = np.asarray(calibration["cam_to_twop"])
+        transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
+        transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
+        transformations[2,0] = np.asarray(calibration["twop_to_cam"])
+        transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
+    except:
+        print("calibration couldn't be loaded, defaulting to identity")
 
     front_pipe_cam, back_pipe_cam = Pipe()
     front_pipe_save, back_pipe_save = Pipe()
@@ -65,6 +98,23 @@ if __name__ == "__main__":
     save_process.start()
 
     app = QApplication(sys.argv)
+
+    # Control LEDs
+    daio = LabJackU3LV_new()
+    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
+    led_widget = LEDWidget(led_drivers=[led])
+    led_widget.show()
+
+    # Control DMD
+    dmd_widget = DMD(screen_num=SCREEN_DMD)
+
+    cam_drawer = DrawPolyMask(np.zeros((512,512)))
+    dmd_drawer = DrawPolyMask(np.zeros((DMD_HEIGHT,DMD_WIDTH)))
+    twop_drawer = DrawPolyMask(np.zeros((512,512)))
+
+    cam_mask = DrawPolyMaskOpto(cam_drawer)
+    dmd_mask = DrawPolyMaskOptoDMD(dmd_drawer)
+    twop_mask = DrawPolyMaskOpto(twop_drawer)
     
     camera_widget = CameraWidget(front_pipe_gui=front_pipe_gui,
                                  display_buffer=display_buffer,
