@@ -20,14 +20,18 @@ class DMD(QWidget):
         
         self.app = QApplication.instance()
         self.screens_available = self.app.screens()
+        for i, screen in enumerate(self.screens_available):
+            print(f"Screen {i}: {screen.name()}, Size: {screen.size()}")
         self.screen = self.screens_available[self.screen_num]
         self.screen_width = self.screen.size().width()
         self.screen_height = self.screen.size().height()
+        print(f'width: {self.screen_width}, height: {self.screen_height}')
         
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint)
         self.setCursor(Qt.BlankCursor)
         self.showFullScreen()
         self.move(self.screen.geometry().topLeft())
+        print(self.screen.geometry(), self.screen)
         
     def create_components(self):
 
@@ -46,29 +50,30 @@ class DMD(QWidget):
         # print('clicked')
 
         image = im2rgb(im2uint8(image))
+        print(f'image shape: {image.shape}')
         self.img_label.setPixmap(NDarray_to_QPixmap(image))     
 
-class ImageSender(QWidget):
+# class ImageSender(QWidget):
 
-    send_image = pyqtSignal(np.ndarray)
+#     send_image = pyqtSignal(np.ndarray)
 
-    def __init__ (self, dmd_widget: DMD , *args, **kwargs):
+#     def __init__ (self, dmd_widget: DMD , *args, **kwargs):
 
-        super().__init__(*args, **kwargs)
-        self.dmd_widget = dmd_widget
+#         super().__init__(*args, **kwargs)
+#         self.dmd_widget = dmd_widget
 
-        self.send_image.connect(self.dmd_widget.update_image)
+#         self.send_image.connect(self.dmd_widget.update_image)
 
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.loop)
-        self.timer.setInterval(33)
-        self.timer.start()
+#         self.timer = QTimer()
+#         self.timer.timeout.connect(self.loop)
+#         self.timer.setInterval(33)
+#         self.timer.start()
     
-    def loop(self):
-        image = np.random.randint(
-            0, 255,
-            [self.dmd_widget.screen_height, self.dmd_widget.screen_width], 
-            np.uint8
-        )
+#     def loop(self):
+#         image = np.random.randint(
+#             0, 255,
+#             [self.dmd_widget.screen_height, self.dmd_widget.screen_width], 
+#             np.uint8
+#         )
 
-        self.send_image.emit(image)
+#         self.send_image.emit(image)
