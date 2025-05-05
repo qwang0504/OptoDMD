@@ -15,7 +15,7 @@ from queue import Empty, Full
 import cv2
 from arrayqueues import ArrayQueue
 import ctypes
-from video_tools import FFMPEG_VideoWriter_CPU_Grayscale
+from video_writer import FFMPEG_VideoWriter_CPU_Grayscale
 from pathlib import Path
 
 # TODO: revisit q-value 
