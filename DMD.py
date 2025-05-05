@@ -15,6 +15,8 @@ class DMD(QWidget):
         self.screen_num = screen_num
         self.configure_screen()
         self.create_components()
+        self.setGeometry(self.screen.geometry())
+        # print(self.geometry())
 
     def configure_screen(self):
         
@@ -25,7 +27,7 @@ class DMD(QWidget):
         self.screen = self.screens_available[self.screen_num]
         self.screen_width = self.screen.size().width()
         self.screen_height = self.screen.size().height()
-        print(f'width: {self.screen_width}, height: {self.screen_height}')
+        # print(f'width: {self.screen_width}, height: {self.screen_height}')
         
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint)
         self.setCursor(Qt.BlankCursor)
