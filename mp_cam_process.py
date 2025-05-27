@@ -79,7 +79,7 @@ class CameraProcess(Process):
 
     def update(self):
         msg = self.back_pipe_cam.recv()
-        if isinstance(msg, dict):
+        if isinstance(msg, dict) and 'command' in msg:
             set_method = getattr(self.camera, msg['command'], None)
             set_method(msg['value'])    
             updated_cam_params = {}
@@ -90,8 +90,16 @@ class CameraProcess(Process):
                 updated_cam_params[attr] = {'value': updated_value, 
                                             'range': updated_range, 
                                             'increment': updated_increment}
-            self.frame_interval = np.round(updated_cam_params['framerate']['value'] / 60) #display at 60 fps
+            self.frame_interval = np.round(updated_cam_params['framerate']['value'] / 60) #display at ~60 fps
             self.back_pipe_cam.send(updated_cam_params)
+
+        elif isinstance(msg, dict):
+            print(f'Params received by CameraProcess: {msg}')
+            for attr, param in msg.items():
+                value = param['value']
+                setattr(self, attr, value)
+                print(f'cam {attr}, {value}')
+                self.frame_interval = np.round(msg['framerate']['value'] / 60) #display at ~60 fps
 
         elif isinstance(msg, str):
             self.mode = msg
@@ -122,8 +130,8 @@ class CameraProcess(Process):
     def save_mode(self):
         self.start_acquisition()
         # self.previous_qsize = -1
-        fs = open('cam_frames_AQ_250_save.txt', 'w')
-        fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
+        fs = open('cam_frames_AQ_200_save.txt', 'w')
+        fd = open('cam_frames_AQ_200_display_ds.txt', 'w')
         frame_count = 0
         while self.start_event.is_set():
             frame = self.camera.get_frame()
