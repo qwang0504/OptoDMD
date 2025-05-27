@@ -21,7 +21,8 @@ from pathlib import Path
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
 # TODO: link terminate to StimManager
-
+# TODO: fix layout order
+# TODO: fix params state sent to CameraProcess 
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
@@ -210,7 +211,7 @@ class CameraWidget(QWidget):
         self.generate_folder_button.hide()
 
         self.metadata_checkbox = QCheckBox('Trial metadata', self)
-        self.metadata_checkbox.setCheckState(True)
+        self.metadata_checkbox.setCheckState(False)
         self.metadata_checkbox.stateChanged.connect(self.generate_metadata)
 
     def layout_components(self):
@@ -227,6 +228,16 @@ class CameraWidget(QWidget):
         layout_spinboxes.addWidget(self.exposure_spinbox)
         layout_spinboxes.addWidget(self.gain_spinbox)
 
+        layout_directory = QVBoxLayout()
+        layout_directory.addWidget(self.output_directory_button)
+        layout_directory.addWidget(self.directory_label)
+        layout_directory.addWidget(self.metadata_checkbox)
+        layout_directory.addWidget(self.automate_checkbox)
+
+        layout_fish_num = QHBoxLayout()
+        layout_fish_num.addWidget(self.fish_number_spinbox)
+        layout_fish_num.addWidget(self.generate_folder_button)
+
         layout = QVBoxLayout()
         layout.addWidget(self.camera_preview)
         layout.addLayout(layout_start_stop)
@@ -234,6 +245,8 @@ class CameraWidget(QWidget):
         layout.addLayout(layout_spinboxes)
         layout.addWidget(self.terminate_button)
         layout.addWidget(self.file_name_input)
+        layout.addLayout(layout_directory)
+        layout.addLayout(layout_fish_num)
         
         self.setLayout(layout)
 
@@ -241,45 +254,47 @@ class CameraWidget(QWidget):
     ### Callbacks
 
     def start_acquisition(self):
-        if self.worker is None:
-            self.worker = DisplayWorker(display_buffer=self.display_buffer)
-            self.worker.frame_ready.connect(self.update_display)
-            self.qthread = QThread()
-            self.worker.moveToThread(self.qthread)
-            self.qthread.started.connect(self.worker.run)
-            self.qthread.start()
-            self.front_pipe_gui.send('start_acquisition')
-            self.acquisition_disabled()
+        # if self.worker is None:
+        self.worker = DisplayWorker(display_buffer=self.display_buffer)
+        self.worker.frame_ready.connect(self.update_display)
+        self.qthread = QThread()
+        self.worker.moveToThread(self.qthread)
+        self.qthread.started.connect(self.worker.run)
+        self.qthread.start()
+        self.front_pipe_gui.send('start_acquisition')
+        self.acquisition_disabled()
 
-        else: 
-            self.front_pipe_gui.send('start_acquisition')
-            self.acquisition_disabled()
+        # else: 
+        #     self.front_pipe_gui.send('start_acquisition')
+        #     self.acquisition_disabled()
 
     def stop_acquisition(self):
-        self.front_pipe_gui.send('stop_acquisition')
         self.display_buffer.put(self.sentinel_array)
+        self.front_pipe_gui.send('stop_acquisition')
         self.close_thread()
         self.acquisition_enabled()
 
     def start_recording(self):
         self.video_start_time = time.perf_counter_ns()
         self.params['video_start_time'] = {'value': self.video_start_time}
+        # print(self.params)
         self.front_pipe_gui.send('start_recording')
+        # self.update_params()
         self.front_pipe_gui.send(self.params)
 
-        if self.worker is None: 
-            self.worker = DisplayWorker(display_buffer=self.display_buffer)
-            self.worker.frame_ready.connect(self.update_display)
-            self.qthread = QThread()
-            self.worker.moveToThread(self.qthread)
-            self.qthread.started.connect(self.worker.run)
-            self.qthread.start()
-            self.record_disabled()
+        # if self.worker is None: 
+        self.worker = DisplayWorker(display_buffer=self.display_buffer)
+        self.worker.frame_ready.connect(self.update_display)
+        self.qthread = QThread()
+        self.worker.moveToThread(self.qthread)
+        self.qthread.started.connect(self.worker.run)
+        self.qthread.start()
+        self.record_disabled()
 
-        else:
-            self.front_pipe_gui.send('start_recording')
-            self.front_pipe_gui.send(self.params)
-            self.record_disabled()
+        # else:
+        #     self.front_pipe_gui.send('start_recording')
+        #     self.front_pipe_gui.send(self.params)
+        #     self.record_disabled()
 
     def stop_recording(self):
         self.front_pipe_gui.send('stop_recording')
@@ -306,6 +321,10 @@ class CameraWidget(QWidget):
             self.camera_preview.setPixmap(NDarray_to_QPixmap(self.worker.frame['image']))
         except AttributeError:
             pass    
+    
+    # def update_params(self):
+    #     # some function to finalise params before sending 
+    #     print(self.params)
 
     def set_exposure(self):
         msg = {'command': 'set_exposure', 'value': self.exposure_spinbox.value()}
@@ -413,7 +432,7 @@ class CameraWidget(QWidget):
 
     def close_thread(self):
         self.qthread.quit()
-        self.qthread.wait()
+        self.qthread.wait() 
         self.qthread = None
         self.worker = None
         print('qthread closed, defaults to None')
