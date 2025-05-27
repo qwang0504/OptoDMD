@@ -39,20 +39,20 @@ class SaveProcess(Process):
         self.fish_id = None
         self.active = True
 
+        self.metadata = False
+
     def get_params(self):
         msg = self.back_pipe_save.recv()
+        print(f'Process {self.name} received {msg}')
 
         if isinstance(msg, dict):
-            print(f'Process {self.name} received save parameters')
             for attr, param in msg.items():
                 value = param['value']
                 setattr(self, attr, value)
-                print(attr, value)
+                print(f'save: {attr}, {value}')
 
-        elif isinstance(msg, str):
-            print(f'Process {self.name} received {msg} message')
-            if msg == 'terminate':
-                self.terminate()
+        elif msg == 'terminate':
+            self.terminate()
 
     def terminate(self):
         self.active = False

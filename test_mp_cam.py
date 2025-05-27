@@ -21,44 +21,11 @@ from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 from metadata import Metadata
 from PyQt5.QtWidgets import QApplication
 
-# TODO: fix metadata has no output_dir
-# TODO: fix layout for new widgets
-# TODO: check arrayqueue length
-# TODO: PWM duty cycle not precise
 
 if __name__ == "__main__":
 
     height = 488
     width = 648
-
-    PROTOCOL = "ipc://"
-    HOST = "localhost"
-    PORT = 5000
-
-    # dmd settings
-    SCREEN_DMD = 2
-    # main screen: 0, right vertical screen: 1, DMD: 2
-    DMD_HEIGHT = 1140
-    DMD_WIDTH = 912
-
-    # labjack settingss
-    PWM_CHANNEL = 6
-    
-    # calibration file
-    transformations = np.tile(np.eye(3), (3,3,1,1))
-    try:
-        with open('calibration_3x/calibration.json', 'r') as f:
-            calibration = json.load(f)
-
-        # 0: cam, 1: dmd, 2: twop
-        transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
-        transformations[0,2] = np.asarray(calibration["cam_to_twop"])
-        transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
-        transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
-        transformations[2,0] = np.asarray(calibration["twop_to_cam"])
-        transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
-    except:
-        print("calibration couldn't be loaded, defaulting to identity")
 
     front_pipe_cam, back_pipe_cam = Pipe()
     front_pipe_save, back_pipe_save = Pipe()
@@ -104,52 +71,11 @@ if __name__ == "__main__":
     save_process.start()
 
     app = QApplication(sys.argv)
-
-    # Control LEDs
-    daio = LabJackU3LV_new()
-    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "475 nm") 
-    led_widget = LEDWidget(led_drivers=[led])
-    led_widget.show()
-
-    # Control DMD
-    dmd_widget = DMD(screen_num=SCREEN_DMD)
-
-    cam_drawer = DrawPolyMask(np.zeros((512,512)))
-    dmd_drawer = DrawPolyMask(np.zeros((DMD_HEIGHT,DMD_WIDTH)))
-    twop_drawer = DrawPolyMask(np.zeros((512,512)))
-
-    cam_mask = DrawPolyMaskOpto(cam_drawer)
-    dmd_mask = DrawPolyMaskOptoDMD(dmd_drawer)
-    twop_mask = DrawPolyMaskOpto(twop_drawer)
-
-    masks = MaskManager([cam_mask, dmd_mask, twop_mask], ["Camera", "DMD", "Two Photon"], transformations)
-    masks.show()
-
-    stim_manager = StimManager(mask_manager=masks, led_driver=led)
-    stim_manager.show()
-
     
     camera_widget = CameraWidget(front_pipe_gui=front_pipe_gui,
                                  display_buffer=display_buffer,
                                  save_buffer=save_buffer,
                                  sentinel_array=sentinel)
-    
-    # metadata = Metadata(stim_manager=stim_manager,
-    #                     camera_widget=camera_widget)
-
-    # Connect signals and slots
-    # connect signals and slots
-    dmd_mask.DMD_update.connect(dmd_widget.update_image)
-    masks.mask_expose.connect(dmd_mask.expose)
-    stim_manager.mask_expose.connect(dmd_mask.expose)
-    masks.clear_dmd.connect(dmd_mask.clear)
-    camera_widget.terminate_pressed.connect(stim_manager.stop)
-    stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
-    stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
-    stim_manager.trial_started.connect(camera_widget.start_recording)
-    stim_manager.trial_ended.connect(camera_widget.stop_recording)
-
-    # stim_manager.launch_metadata.connect(metadata.initialise_widget)
 
     camera_widget.show()
 

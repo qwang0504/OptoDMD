@@ -166,6 +166,7 @@ class StimManager(QWidget):
         layout_controls.setSpacing(20)
 
         layout_overall.addLayout(layout_controls)
+        layout_overall.addWidget(self.metadata_checkbox)
         
 
     # Callbacks
