@@ -130,8 +130,8 @@ class CameraProcess(Process):
     def save_mode(self):
         self.start_acquisition()
         # self.previous_qsize = -1
-        fs = open('cam_frames_AQ_200_save.txt', 'w')
-        fd = open('cam_frames_AQ_200_display_ds.txt', 'w')
+        fs = open('cam_frames_AQ_250_save.txt', 'w')
+        fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
         frame_count = 0
         while self.start_event.is_set():
             frame = self.camera.get_frame()

@@ -122,7 +122,6 @@ class LEDD1B:
 
 
 
-
 class DriverWidget(QWidget):
     
     def __init__(self, driver: LEDDriver, *args, **kwargs):
@@ -194,6 +193,7 @@ class DriverWidget(QWidget):
 
     def pulse(self):
         self.driver.pulse(duration_ms=self.pulse_spinbox.value())
+
 
 
 class LEDWidget(QWidget):

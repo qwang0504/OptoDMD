@@ -210,7 +210,7 @@ class LabJackU3LV:
         self.device.close()
 
 
-class LabJackU3LV_new:
+class LabJackU3LV_hl:
 
     def __init__(self) -> None:
         self.device = u3.U3()

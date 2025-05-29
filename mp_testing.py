@@ -14,7 +14,7 @@ from LED import LEDD1B
 from metadata import Metadata
 import numpy as np
 import json
-from daq import LabJackU3LV_new
+from daq import LabJackU3LV_hl
 from LED import LEDWidget, LEDD1B
 from DMD import DMD
 from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Control LEDs
-    daio = LabJackU3LV_new()
+    daio = LabJackU3LV_hl()
     led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "475 nm") 
     led_widget = LEDWidget(led_drivers=[led])
     led_widget.show()

@@ -1,5 +1,5 @@
 from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
-from daq import LabJackU3LV, LabJackU3LV_new
+from daq import LabJackU3LV, LabJackU3LV_hl
 from LED import LEDD1B, LEDWidget
 from DMD import DMD
 from PyQt5.QtWidgets import QApplication
@@ -46,7 +46,7 @@ app = QApplication(sys.argv)
 
 
 # Control LEDs
-daio = LabJackU3LV_new()
+daio = LabJackU3LV_hl()
 led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "465 nm") 
 led_widget = LEDWidget(led_drivers=[led])
 led_widget.show()

@@ -14,7 +14,7 @@ from LED import LEDD1B
 from metadata import Metadata
 import numpy as np
 import json
-from daq import LabJackU3LV_new
+from daq import LabJackU3LV_hl
 from LED import LEDWidget, LEDD1B
 from DMD import DMD
 from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD

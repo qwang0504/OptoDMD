@@ -16,7 +16,7 @@ matplotlib.use('Qt5Agg')
 from old_code.video_writer import OpenCV_VideoWriter
 
 from old_code.camera_widgets import CameraControl_MP, CameraControl
-from daq import LabJackU3LV, LabJackU3LV_new
+from daq import LabJackU3LV, LabJackU3LV_hl
 from LED import LEDD1B, LEDWidget
 from DrawMasks import  MaskManager, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 import sys
@@ -32,7 +32,7 @@ cam = XimeaCamera(0)
 camera_controls = CameraControl(cam)
 camera_controls.show()
 
-daio = LabJackU3LV_new()
+daio = LabJackU3LV_hl()
 led = LEDD1B(daio, pwm_channel=4, name = "465 nm") 
 led_widget = LEDWidget(led_drivers=[led])
 led_widget.show()
