@@ -1,7 +1,7 @@
 import multiprocessing
 from camera_tools import XimeaCamera, Camera
-from PyQt5.QtWidgets import QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QFileDialog
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
+from PyQt5.QtWidgets import QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QFileDialog, QCalendarWidget
+from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, QDate
 from qt_widgets import NDarray_to_QPixmap, LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, LabeledEditLine
 import numpy as np
 from ipc_tools import ModifiableRingBuffer
@@ -29,6 +29,7 @@ from pathlib import Path
 # TODO: automated mode automatically generates metadata?
 # TODO: check display buffer size!!
 # TODO: toggle to open fish metadata window 
+# TODO: stop acquisition queue.Full problem
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
@@ -92,6 +93,8 @@ class CameraWidget(QWidget):
 
         self.worker = None
         self.qthread = None
+
+        self.acquisition_started = False
 
         self.params = {}
 
@@ -187,16 +190,16 @@ class CameraWidget(QWidget):
         self.stop_record_button.setText('Stop recording')
         self.stop_record_button.clicked.connect(self.stop_recording)
 
-        self.terminate_button = QPushButton(self)
-        self.terminate_button.setText('Terminate all processes')
-        self.terminate_button.clicked.connect(self.terminate)
-
         self.camera_preview = QLabel(self)
         self.camera_preview.setFixedSize(self.init_params['width']['value'], self.init_params['height']['value'])
 
         self.automate_checkbox = QCheckBox('Automated mode', self)
         self.automate_checkbox.setCheckState(False)
         self.automate_checkbox.stateChanged.connect(self.toggle_widgets)
+
+        self.fish_metadata_checkbox = QCheckBox('Fish metadata', self)
+        self.fish_metadata_checkbox.setCheckState(False)
+        self.fish_metadata_checkbox.stateChanged.connect(self.toggle_fish_metadata)
 
         self.output_directory_button = QPushButton('Select output directory')
         self.output_directory_button.clicked.connect(self.select_directory) 
@@ -216,9 +219,29 @@ class CameraWidget(QWidget):
         self.generate_folder_button.clicked.connect(self.generate_fish_folder)
         self.generate_folder_button.hide()
 
-        self.metadata_checkbox = QCheckBox('Trial metadata', self)
-        self.metadata_checkbox.setCheckState(False)
-        self.metadata_checkbox.stateChanged.connect(self.generate_metadata)
+        self.calendar = QCalendarWidget(self)
+        self.calendar.setGridVisible(True)
+        self.calendar.selectionChanged.connect(self.calculate_age)
+        self.calendar.hide()
+
+        self.calendar_label = QLabel(self)
+        self.calendar_label.setText('Date of birth: ')
+        self.calendar_label.hide()
+
+        self.dpf_label = QLabel(self)
+        self.dpf_label.setText('Days post-fertilisation: ')
+        self.dpf_label.hide()
+
+        self.fishline_input = QLineEdit(self)
+        self.fishline_input.setText('Fish line')
+        self.fishline_input.returnPressed.connect(self.set_fishline)
+        self.fishline_input.hide()
+
+        self.condition_input = QLineEdit(self)
+        self.condition_input.setText('Condition')
+        self.condition_input.returnPressed.connect(self.set_condition)
+        self.condition_input.hide()
+
 
     def layout_components(self):
         layout_start_stop = QHBoxLayout()
@@ -234,61 +257,72 @@ class CameraWidget(QWidget):
         layout_spinboxes.addWidget(self.exposure_spinbox)
         layout_spinboxes.addWidget(self.gain_spinbox)
 
-        layout_directory = QVBoxLayout()
-        layout_directory.addWidget(self.output_directory_button)
-        layout_directory.addWidget(self.directory_label)
-        layout_directory.addWidget(self.metadata_checkbox)
-        layout_directory.addWidget(self.automate_checkbox)
+        layout_file = QHBoxLayout()
+        layout_file.addWidget(self.file_name_input)
+        layout_file.addWidget(self.output_directory_button)
+
+        layout_checkboxes = QVBoxLayout()
+        layout_checkboxes.addWidget(self.automate_checkbox)
+        layout_checkboxes.addWidget(self.fish_metadata_checkbox)
 
         layout_fish_num = QHBoxLayout()
         layout_fish_num.addWidget(self.fish_number_spinbox)
         layout_fish_num.addWidget(self.generate_folder_button)
+
+        layout_fish_metadata = QVBoxLayout()
+        layout_fish_metadata.addWidget(self.calendar_label)
+        layout_fish_metadata.addWidget(self.calendar)
+        layout_fish_metadata.addWidget(self.dpf_label)
+        layout_fish_metadata.addWidget(self.fishline_input)
+        layout_fish_metadata.addWidget(self.condition_input)
 
         layout = QVBoxLayout()
         layout.addWidget(self.camera_preview)
         layout.addLayout(layout_start_stop)
         layout.addLayout(layout_record)
         layout.addLayout(layout_spinboxes)
-        layout.addWidget(self.terminate_button)
-        layout.addWidget(self.file_name_input)
-        layout.addLayout(layout_directory)
+        # layout.addWidget(self.terminate_button)
+        layout.addLayout(layout_file)
+        layout.addWidget(self.directory_label)
+        layout.addLayout(layout_checkboxes)
         layout.addLayout(layout_fish_num)
+        layout.addLayout(layout_fish_metadata)
         
         self.setLayout(layout)
 
 
     ### Callbacks
 
-    def start_acquisition(self):
+    def setup_worker(self):
         self.worker = DisplayWorker(display_buffer=self.display_buffer)
         self.worker.frame_ready.connect(self.update_display)
         self.qthread = QThread()
         self.worker.moveToThread(self.qthread)
         self.qthread.started.connect(self.worker.run)
         self.qthread.start()
+
+    def start_acquisition(self):
+        self.setup_worker()
         self.front_pipe_gui.send('start_acquisition')
         self.acquisition_disabled()
+        self.acquisition_started = True
 
     def stop_acquisition(self):
-        self.display_buffer.put(self.sentinel_array)
-        self.front_pipe_gui.send('stop_acquisition')
-        self.close_thread()
-        self.acquisition_enabled()
+        if self.acquisition_started:
+            self.display_buffer.put(self.sentinel_array)
+            self.front_pipe_gui.send('stop_acquisition')
+            self.close_thread()
+            self.acquisition_enabled()
+            self.acquisition_started = False
+        else: 
+            print('Acquisition not started')
 
     def start_recording(self):
         self.video_start_time = time.perf_counter_ns()
         self.params['video_start_time'] = {'value': self.video_start_time}
-        # print(self.params)
         self.front_pipe_gui.send('start_recording')
-        # self.update_params()
         self.front_pipe_gui.send(self.params)
-
-        self.worker = DisplayWorker(display_buffer=self.display_buffer)
-        self.worker.frame_ready.connect(self.update_display)
-        self.qthread = QThread()
-        self.worker.moveToThread(self.qthread)
-        self.qthread.started.connect(self.worker.run)
-        self.qthread.start()
+        self.setup_worker()
         self.record_disabled()
 
     def stop_recording(self):
@@ -373,14 +407,18 @@ class CameraWidget(QWidget):
         self.framerate_spinbox.setEnabled(True)
         self.file_name_input.setEnabled(True)
 
-    def toggle_widgets(self):
-        if self.automate_checkbox.isChecked():
-            self.fish_number_spinbox.show()
-            self.generate_folder_button.show()
-            
-        else:
-            self.fish_number_spinbox.hide()
-            self.generate_folder_button.hide()
+    def toggle_widgets(self, state):
+        self.fish_number_spinbox.setVisible(state)
+        self.generate_folder_button.setVisible(state)
+        self.adjustSize()
+
+    def toggle_fish_metadata(self, state):
+        self.calendar.setVisible(state)
+        self.calendar_label.setVisible(state)
+        self.dpf_label.setVisible(state)
+        self.fishline_input.setVisible(state)
+        self.condition_input.setVisible(state)
+        self.adjustSize()
 
     def select_directory(self):
         self.output_dir = QFileDialog.getExistingDirectory(self, 'Select output directory')
@@ -424,12 +462,33 @@ class CameraWidget(QWidget):
     def set_trial_index(self, trial_index):
         self.trial_index = trial_index
         self.params['trial_index'] = {'value': self.trial_index}
+    
+    def calculate_age(self):
+        # Get the selected date
+        dob = self.calendar.selectedDate()
+        # Format the date as a string
+        dob_str = dob.toString("yyyy-MM-dd")
+        self.dob = dob.toString("yyyyMMdd")
+        # Update the label with the selected date
+        self.calendar_label.setText(f"Date of birth: {dob_str}")
+        self.today = datetime.today()
+        today_qdate = QDate(self.today.year, self.today.month, self.today.day)
+        # self.age = today_qdate.daysTo(dob)
+        self.age = dob.daysTo(today_qdate) - 1
+        self.dpf_label.setText(f'Days post-fertilisation: {self.age}')
+        print(self.age)
 
-    def generate_metadata(self):
-        if self.metadata_checkbox.isChecked:
-            self.params['metadata'] = {'value': True}
-        else: 
-            self.params['metadata'] = {'value': False}
+    def set_fishline(self):
+        self.fishline = self.fishline_input.text()
+
+    def set_condition(self):
+        self.condition = self.condition_input.text()
+
+    # def generate_metadata(self):
+    #     if self.metadata_checkbox.isChecked:
+    #         self.params['metadata'] = {'value': True}
+    #     else: 
+    #         self.params['metadata'] = {'value': False}
 
     def close_thread(self):
         self.qthread.quit()
