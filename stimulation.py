@@ -3,16 +3,18 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScro
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox, LabeledSliderSpinBox
 from DrawMasks import MaskManager
 from LED import LEDDriver, PulseSender
-from daq import LabJackU3LV, LabJackU3LV_new, DigitalAnalogIO
+from daq import LabJackU3LV, LabJackU3LV_hl, DigitalAnalogIO
 import time
 import numpy as np
 import zmq
 import copy
 
-# TODO: sync with other processes
 # TODO: think about if this needs to run on a separate process
 # TODO: check if time.perf_counter_ns() / windows high-res timer works better
 # TODO: update method without shuffle
+# TODO: add buttons next to fish number and stim spinboxes to generate folders 
+# TODO: disable start stim button when started 
+# TODO: implement terminate method 
 
 class StimManager(QWidget):
 
@@ -77,9 +79,15 @@ class StimManager(QWidget):
         self.interval_spinbox.setText('Interval duration (s)')
         self.interval_spinbox.setValue(0)
         self.interval_spinbox.valueChanged.connect(self.set_interval)
+
+        self.led_dial_spinbox = LabeledDoubleSpinBox(self)
+        self.led_dial_spinbox.setText('LED Dial')
+        self.led_dial_spinbox.setRange(0,6)
+        self.led_dial_spinbox.setSingleStep(0.5)
+        self.led_dial_spinbox.valueChanged.connect(self.set_led_dial_value)
         
         self.intensity_slider = LabeledSliderSpinBox(self)
-        self.intensity_slider.setText('intensity (%)')
+        self.intensity_slider.setText('Duty Cycle (%)')
         self.intensity_slider.setRange(0, 100)
         self.intensity_slider.setValue(0)
         self.intensity_slider.valueChanged.connect(self.set_intensity)
@@ -151,6 +159,7 @@ class StimManager(QWidget):
         layout_controls.addWidget(self.fish_number_input)
         layout_controls.addWidget(self.stim_number_input)
         
+        layout_controls.addWidget(self.led_dial_spinbox)
         layout_controls.addWidget(self.intensity_slider)
         layout_controls.addWidget(self.freq_spinbox)
         layout_controls.addWidget(self.duration_spinbox)
@@ -224,11 +233,14 @@ class StimManager(QWidget):
 
     def set_stim_number(self):
         self.stim_number = self.stim_number_input.value()
-        self.stim_folder = 'stim' + self.stim_number
-        self.stim_n.emit(self.stim_number)
+        # self.stim_folder = 'stim' + self.stim_number
+        self.stim_number_set.emit(self.stim_number)
 
     def set_interval(self):
         self.interval = self.interval_spinbox.value()
+
+    def set_led_dial_value(self):
+        self.led_dial_value = self.led_dial_spinbox.value()
 
     def start(self):
         self.set_number_of_elements()
@@ -292,10 +304,10 @@ class StartStim(QRunnable):
         if self.stim_manager.shuffled_mask_keys:
             for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
                 self.trial_signal.trial_index.emit(i+1) #1-based trial indexing
-                time.sleep(1) #give time to send trial index over to CameraWidget
+                time.sleep(1) #give time for CameraWidget to receive trial index
 
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
-                print('trial start signal emitted: ', time.time())
+                print('trial start signal emitted: ', time.perf_counter_ns())
                 print('trial index: ', i+1)
                 time.sleep(2) #start recording first before exposing mask and pulsing LED
                 
@@ -312,6 +324,8 @@ class StartStim(QRunnable):
                 self.pulse_start[i] = self.led_driver.pulse_sender.time_start
                 self.pulse_end[i] = self.led_driver.pulse_sender.time_end
                 self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                self.led_dial = self.stim_manager.led_dial_value
+                print(f'LED dial value: {self.led_dial}')
                 
                 if not self.active:
                     break 

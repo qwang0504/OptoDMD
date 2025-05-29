@@ -21,8 +21,14 @@ from pathlib import Path
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
 # TODO: link terminate to StimManager
-# TODO: fix layout order
-# TODO: fix params state sent to CameraProcess 
+# TODO: fix layout, buttons
+# TODO: remove terminate button; redundant
+# TODO: streamline metadata 
+# TODO: add reminder to click Enter after file input 
+# TODO: why does video start time at main process start after start time at save process???
+# TODO: automated mode automatically generates metadata?
+# TODO: check display buffer size!!
+# TODO: toggle to open fish metadata window 
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
@@ -254,7 +260,6 @@ class CameraWidget(QWidget):
     ### Callbacks
 
     def start_acquisition(self):
-        # if self.worker is None:
         self.worker = DisplayWorker(display_buffer=self.display_buffer)
         self.worker.frame_ready.connect(self.update_display)
         self.qthread = QThread()
@@ -263,10 +268,6 @@ class CameraWidget(QWidget):
         self.qthread.start()
         self.front_pipe_gui.send('start_acquisition')
         self.acquisition_disabled()
-
-        # else: 
-        #     self.front_pipe_gui.send('start_acquisition')
-        #     self.acquisition_disabled()
 
     def stop_acquisition(self):
         self.display_buffer.put(self.sentinel_array)
@@ -282,7 +283,6 @@ class CameraWidget(QWidget):
         # self.update_params()
         self.front_pipe_gui.send(self.params)
 
-        # if self.worker is None: 
         self.worker = DisplayWorker(display_buffer=self.display_buffer)
         self.worker.frame_ready.connect(self.update_display)
         self.qthread = QThread()
@@ -290,11 +290,6 @@ class CameraWidget(QWidget):
         self.qthread.started.connect(self.worker.run)
         self.qthread.start()
         self.record_disabled()
-
-        # else:
-        #     self.front_pipe_gui.send('start_recording')
-        #     self.front_pipe_gui.send(self.params)
-        #     self.record_disabled()
 
     def stop_recording(self):
         self.front_pipe_gui.send('stop_recording')
@@ -322,10 +317,6 @@ class CameraWidget(QWidget):
         except AttributeError:
             pass    
     
-    # def update_params(self):
-    #     # some function to finalise params before sending 
-    #     print(self.params)
-
     def set_exposure(self):
         msg = {'command': 'set_exposure', 'value': self.exposure_spinbox.value()}
         self.front_pipe_gui.send(msg)
@@ -404,7 +395,7 @@ class CameraWidget(QWidget):
             date = datetime.today().strftime('%Y%m%d')
             self.fish_id = date + f'{self.fish_number:03}'
             self.fish_folder = Path(self.output_dir, self.fish_id)
-            
+
             if not self.fish_folder.exists():
                 self.fish_folder.mkdir(parents=True)
                 print(f'Fish folder {str(self.fish_folder)} created')
@@ -418,7 +409,17 @@ class CameraWidget(QWidget):
     
     def set_stim_number(self, stim_number):
         self.stim_number = stim_number
+        stim_folder = 'stim' + str(self.stim_number)
         self.params['stim_number'] = {'value': self.stim_number}
+        if self.fish_folder:
+            self.stim_folder = Path(self.fish_folder, stim_folder)
+            if not self.stim_folder.exists():
+                self.stim_folder.mkdir(parents=True)
+            else:
+                print(f'stim{self.stim_number} folder already exists')
+            
+        else:
+            print('Fish folder not found!')
 
     def set_trial_index(self, trial_index):
         self.trial_index = trial_index

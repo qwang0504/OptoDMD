@@ -59,11 +59,11 @@ class SaveProcess(Process):
 
     def init_videowriter(self):
         if self.fish_id:
-            self.video_name = self.filename + self.trial_index 
+            self.video_name = self.filename + str(self.trial_index)
             self.stim_folder = 'stim' + str(self.stim_number)
             self.video_path = str(Path(self.output_dir, 
-                                       self.stim_folder, 
                                        self.fish_id, 
+                                       self.stim_folder, 
                                        self.video_name))
             self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
                                                                  width=self.width,
@@ -76,6 +76,8 @@ class SaveProcess(Process):
             
         else:
             self.video_name = self.filename 
+            # video_start_time_2 = time.perf_counter_ns()
+            # print(f'video_start_time_2: {video_start_time_2}')
             self.video_path = str(Path(self.output_dir, self.video_name))
             self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
                                                                 width=self.width,
@@ -122,6 +124,9 @@ class SaveProcess(Process):
                 break 
             self.init_videowriter()
             fd = open('save_frames_AQ_250.txt', 'w')
+            # video_start_time_3 = time.perf_counter_ns()
+            # print(f'video_start_time_3: {video_start_time_3}')
+
             while self.active:
                 frame = self.save_buffer.get()
                 if frame['image'].sum() > 0:
@@ -129,7 +134,7 @@ class SaveProcess(Process):
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                 else: 
                     self.release_file()
-                    self.generate_trial_metadata()
+                    # self.generate_trial_metadata()
                     fd.close()
                     break
             print('File saving finished')
