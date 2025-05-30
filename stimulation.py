@@ -2,19 +2,20 @@ from PyQt5.QtCore import pyqtSignal, Qt, QRunnable, QThreadPool, pyqtSlot, QObje
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QScrollArea, QPushButton, QFrame, QLineEdit, QCheckBox, QListWidget
 from qt_widgets import LabeledSpinBox, LabeledDoubleSpinBox, LabeledSliderSpinBox
 from DrawMasks import MaskManager
-from LED import LEDDriver, PulseSender
+from pathlib import Path
+from LED import LEDDriver
 from daq import LabJackU3LV, LabJackU3LV_hl, DigitalAnalogIO
 import time
 import numpy as np
-import zmq
 import copy
+import json
 
 # TODO: think about if this needs to run on a separate process
 # TODO: check if time.perf_counter_ns() / windows high-res timer works better
 # TODO: update method without shuffle
-# TODO: add buttons next to fish number and stim spinboxes to generate folders 
-# TODO: disable start stim button when started 
+# TODO: disable everything except stop button when running?
 # TODO: implement terminate method 
+# TODO: decide on 0-based or 1-based indexing for trials 
 
 class StimManager(QWidget):
 
@@ -27,7 +28,6 @@ class StimManager(QWidget):
     trial_index_set = pyqtSignal(int)
     trial_started = pyqtSignal()
     trial_ended = pyqtSignal()
-    launch_metadata = pyqtSignal()
 
     def __init__(
             self,
@@ -91,7 +91,6 @@ class StimManager(QWidget):
         self.intensity_slider.setRange(0, 100)
         self.intensity_slider.setValue(0)
         self.intensity_slider.valueChanged.connect(self.set_intensity)
-        self.led_driver.set_intensity(0.5)
 
         self.freq_spinbox = LabeledSpinBox(self)
         self.freq_spinbox.setText('PWM frequency (Hz)')
@@ -133,19 +132,19 @@ class StimManager(QWidget):
         self.stim_number_input.setValue(0)
         self.stim_number_input.valueChanged.connect(self.set_stim_number)
 
+        self.generate_stim_folder_button = QPushButton(self)
+        self.generate_stim_folder_button.setText('Create stim folder')
+        self.generate_stim_folder_button.clicked.connect(self.generate_stim_folder)
+
         self.recording_duration_input = LabeledSpinBox(self)
         self.recording_duration_input.setText('Duration of recording (s)')
         self.recording_duration_input.setRange(0, 999)
         self.recording_duration_input.setSingleStep(1)
         self.recording_duration_input.setValue(10)
-        # self.recording_duration_input.valueChanged.connect(self.set_recording_duration)
-
-        self.metadata_checkbox = QCheckBox('Stim protocol metadata', self)
-        self.metadata_checkbox.setCheckState(True)
 
     def layout_components(self):
         
-        layout_overall = QHBoxLayout(self)
+        layout_overall = QHBoxLayout()
 
         layout_shuffle = QVBoxLayout()
         layout_shuffle.addWidget(self.shuffle_button)
@@ -153,11 +152,15 @@ class StimManager(QWidget):
         layout_shuffle.setSpacing(10)
 
         layout_overall.addLayout(layout_shuffle)
+
+        layout_stim = QHBoxLayout()
+        layout_stim.addWidget(self.stim_number_input)
+        layout_stim.addWidget(self.generate_stim_folder_button)
         
         layout_controls = QVBoxLayout()
 
         layout_controls.addWidget(self.fish_number_input)
-        layout_controls.addWidget(self.stim_number_input)
+        layout_controls.addLayout(layout_stim)
         
         layout_controls.addWidget(self.led_dial_spinbox)
         layout_controls.addWidget(self.intensity_slider)
@@ -175,8 +178,8 @@ class StimManager(QWidget):
         layout_controls.setSpacing(20)
 
         layout_overall.addLayout(layout_controls)
-        layout_overall.addWidget(self.metadata_checkbox)
         
+        self.setLayout(layout_overall)
 
     # Callbacks
     def set_intensity(self, value: int):
@@ -226,10 +229,27 @@ class StimManager(QWidget):
         if self.masks_display.count() > 0:
             self.masks_display.clear()
             self.masks_display.addItems(shuffled)
+    
+    def generate_stim_folder(self):
+        if self.fish_folder:
+            self.stim_folder_path = Path(self.fish_folder, 'stim'+str(self.stim_number))
+            if not self.stim_folder_path.exists():
+                 self.stim_folder_path.mkdir(parents=True)
+                 print(f'{self.stim_folder_path} created')
+            else:
+                print(f'Stim folder {self.stim_folder_path} already exists')
+
+        else: 
+            print(f'Fish folder not created for fish number {self.fish_number}')
+
+    def set_fish_folder(self, fish_folder_path, fish_id):
+        self.fish_folder = fish_folder_path
+        self.fish_id = fish_id
+        print(self.fish_id)
 
     def set_fish_number(self):
-        fish_number = self.fish_number_input.value()
-        self.fish_number = f'{fish_number:03}' #adds leading zeros
+        self.fish_number = self.fish_number_input.value()
+        # self.fish_number = f'{fish_number:03}' #adds leading zeros
 
     def set_stim_number(self):
         self.stim_number = self.stim_number_input.value()
@@ -243,6 +263,7 @@ class StimManager(QWidget):
         self.led_dial_value = self.led_dial_spinbox.value()
 
     def start(self):
+        self.start_stim_button.setEnabled(False)
         self.set_number_of_elements()
         self.start_stim = StartStim(stim_manager=self, 
                                     led_driver=self.led_driver) 
@@ -251,15 +272,33 @@ class StimManager(QWidget):
     def stop(self):
         self.start_stim.active = False
 
-    def disable_widget(self):
-        self.setEnabled(False)
+    # def disable_widget(self):
+    #     self.setEnabled(False)
 
-    def enable_widget(self):
-        self.setEnabled(True)
+    # def enable_widget(self):
+    #     self.setEnabled(True)
 
-    def check_metadata(self):
-        if self.metadata_checkbox.isChecked():
-            self.launch_metadata.emit()
+    def toggle_start_button(self):
+        self.start_stim_button.setEnabled(True)
+
+    def generate_metadata(self):
+        stim_metadata = {
+            'fish_id': str(self.fish_id), 
+            'stim_number': self.stim_number,
+            'interval': self.interval_spinbox.value(), 
+            'mask_order': self.shuffled_mask_names, 
+            'led_power': self.start_stim.led_dial,
+            'pwm_frequency': self.freq_spinbox.value(), 
+            'pwm_duty_cycle': self.intensity_slider.value(),
+            'pulse_start': list(self.start_stim.pulse_start), 
+            'pulse_end': list(self.start_stim.pulse_end), 
+            'pulse_duration': list(self.start_stim.pulse_duration)
+        }
+
+        metadata_path = Path(self.stim_folder_path / ('stim' + str(self.stim_number) + '.json'))
+
+        with open(metadata_path, 'w') as file:
+            json.dump(stim_metadata, file)
 
 
 class StimProtocolSignal(QObject):
@@ -292,7 +331,8 @@ class StartStim(QRunnable):
         self.trial_signal.trial_index.connect(self.stim_manager.trial_index_set)
         self.trial_signal.trial_start.connect(self.stim_manager.trial_started)
         self.trial_signal.trial_end.connect(self.stim_manager.trial_ended)
-        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.check_metadata)
+        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.toggle_start_button)
+        self.stim_protocol_signal.protocol_ended.connect(self.stim_manager.generate_metadata)
         # consider propagating signal from QRunnable to StimManager, which then connects to CameraWidget?
         
         self.pulse_start = np.zeros(self.stim_manager.n_elements)
@@ -309,7 +349,7 @@ class StartStim(QRunnable):
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
                 print('trial start signal emitted: ', time.perf_counter_ns())
                 print('trial index: ', i+1)
-                time.sleep(2) #start recording first before exposing mask and pulsing LED
+                time.sleep(2) #start recording first before exposing mask 
                 
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
@@ -325,7 +365,6 @@ class StartStim(QRunnable):
                 self.pulse_end[i] = self.led_driver.pulse_sender.time_end
                 self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
                 self.led_dial = self.stim_manager.led_dial_value
-                print(f'LED dial value: {self.led_dial}')
                 
                 if not self.active:
                     break 
@@ -344,11 +383,11 @@ class StartStim(QRunnable):
                 if not self.active:
                     break 
     
-        # additional 2s before automatically ending the recording 
-        time.sleep(2)
+        # additional 1s before automatically ending the recording 
+        time.sleep(1)
     
         self.stim_protocol_signal.protocol_ended.emit()
-        # self.stim_manager.socket.send_string("LAUNCH METADATA")
+
 
 
 # stim logger 
