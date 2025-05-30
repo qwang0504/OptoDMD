@@ -1,35 +1,27 @@
-import multiprocessing
+import numpy as np
 from camera_tools import XimeaCamera, Camera
 from PyQt5.QtWidgets import QPushButton, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QFileDialog, QCalendarWidget
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMutex, QWaitCondition, QDate
 from qt_widgets import NDarray_to_QPixmap, LabeledDoubleSpinBox, LabeledSliderDoubleSpinBox, LabeledSpinBox, LabeledEditLine
-import numpy as np
 from ipc_tools import ModifiableRingBuffer
 from arrayqueues import ArrayQueue
 from multiprocessing import Process, Pipe, Queue, connection, Event
-import threading
 from threading import Thread
 from functools import partial
 from typing import Callable
 import time
 from queue import Empty, Full
-import ctypes
 import copy 
 from datetime import datetime
 from pathlib import Path
+import json
 
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
-# TODO: link terminate to StimManager
-# TODO: fix layout, buttons
-# TODO: remove terminate button; redundant
-# TODO: streamline metadata 
 # TODO: add reminder to click Enter after file input 
 # TODO: why does video start time at main process start after start time at save process???
-# TODO: automated mode automatically generates metadata?
-# TODO: check display buffer size!!
-# TODO: toggle to open fish metadata window 
-# TODO: stop acquisition queue.Full problem
+# TODO: check display buffer size, stop acquisition queue.Full problem
+# TODO: Check what checkbox state is! printing metadata, 2 for some reason 
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
@@ -74,6 +66,7 @@ class CameraWidget(QWidget):
     record_started = pyqtSignal(int)
     record_stopped = pyqtSignal(int)
     terminate_pressed = pyqtSignal()
+    fish_folder_generated = pyqtSignal(str, str)
 
     def __init__(self, 
                  front_pipe_gui: connection.Connection,
@@ -195,10 +188,12 @@ class CameraWidget(QWidget):
 
         self.automate_checkbox = QCheckBox('Automated mode', self)
         self.automate_checkbox.setCheckState(False)
+        self.automate_checkbox.setTristate(False)
         self.automate_checkbox.stateChanged.connect(self.toggle_widgets)
 
         self.fish_metadata_checkbox = QCheckBox('Fish metadata', self)
         self.fish_metadata_checkbox.setCheckState(False)
+        self.fish_metadata_checkbox.setTristate(False)
         self.fish_metadata_checkbox.stateChanged.connect(self.toggle_fish_metadata)
 
         self.output_directory_button = QPushButton('Select output directory')
@@ -233,14 +228,18 @@ class CameraWidget(QWidget):
         self.dpf_label.hide()
 
         self.fishline_input = QLineEdit(self)
-        self.fishline_input.setText('Fish line')
+        self.fishline_input.setPlaceholderText('Fish line')
         self.fishline_input.returnPressed.connect(self.set_fishline)
         self.fishline_input.hide()
 
         self.condition_input = QLineEdit(self)
-        self.condition_input.setText('Condition')
+        self.condition_input.setPlaceholderText('Condition')
         self.condition_input.returnPressed.connect(self.set_condition)
         self.condition_input.hide()
+
+        self.generate_fish_metadata_button = QPushButton(self)
+        self.generate_fish_metadata_button.setText('Create fish metadata')
+        self.generate_fish_metadata_button.clicked.connect(self.generate_fish_metadata)
 
 
     def layout_components(self):
@@ -275,13 +274,13 @@ class CameraWidget(QWidget):
         layout_fish_metadata.addWidget(self.dpf_label)
         layout_fish_metadata.addWidget(self.fishline_input)
         layout_fish_metadata.addWidget(self.condition_input)
+        layout_fish_metadata.addWidget(self.generate_fish_metadata_button)
 
         layout = QVBoxLayout()
         layout.addWidget(self.camera_preview)
         layout.addLayout(layout_start_stop)
         layout.addLayout(layout_record)
         layout.addLayout(layout_spinboxes)
-        # layout.addWidget(self.terminate_button)
         layout.addLayout(layout_file)
         layout.addWidget(self.directory_label)
         layout.addLayout(layout_checkboxes)
@@ -390,27 +389,20 @@ class CameraWidget(QWidget):
         self.stop_record_button.setEnabled(True)
         
     def record_disabled(self):
-        self.record_button.setEnabled(False)
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(False)
-        self.exposure_spinbox.setEnabled(False)
-        self.gain_spinbox.setEnabled(False)
-        self.framerate_spinbox.setEnabled(False)
-        self.file_name_input.setEnabled(False)
-        
+        for widget in self.findChildren(QWidget):
+            if widget not in (self.stop_record_button, self.camera_preview):
+                widget.setEnabled(False)
+
     def record_enabled(self):
-        self.record_button.setEnabled(True)
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(True)
-        self.exposure_spinbox.setEnabled(True)
-        self.gain_spinbox.setEnabled(True)
-        self.framerate_spinbox.setEnabled(True)
-        self.file_name_input.setEnabled(True)
+        for widget in self.findChildren(QWidget):
+            widget.setEnabled(True)
 
     def toggle_widgets(self, state):
+        print(f'checkbox state: {state}')
         self.fish_number_spinbox.setVisible(state)
         self.generate_folder_button.setVisible(state)
         self.adjustSize()
+        self.params['metadata'] = {'value': state}
 
     def toggle_fish_metadata(self, state):
         self.calendar.setVisible(state)
@@ -441,23 +433,14 @@ class CameraWidget(QWidget):
             else:
                 print(f'Fish folder {self.fish_id} already exists')
                 self.params['fish_id'] = {'value': str(self.fish_id)}
+            self.fish_folder_generated.emit(str(self.fish_folder), str(self.fish_id))
 
         else:
             print('No output directory or fish number')
     
     def set_stim_number(self, stim_number):
         self.stim_number = stim_number
-        stim_folder = 'stim' + str(self.stim_number)
         self.params['stim_number'] = {'value': self.stim_number}
-        if self.fish_folder:
-            self.stim_folder = Path(self.fish_folder, stim_folder)
-            if not self.stim_folder.exists():
-                self.stim_folder.mkdir(parents=True)
-            else:
-                print(f'stim{self.stim_number} folder already exists')
-            
-        else:
-            print('Fish folder not found!')
 
     def set_trial_index(self, trial_index):
         self.trial_index = trial_index
@@ -484,11 +467,24 @@ class CameraWidget(QWidget):
     def set_condition(self):
         self.condition = self.condition_input.text()
 
-    # def generate_metadata(self):
-    #     if self.metadata_checkbox.isChecked:
-    #         self.params['metadata'] = {'value': True}
-    #     else: 
-    #         self.params['metadata'] = {'value': False}
+    def generate_fish_metadata(self):
+        if self.fish_folder:
+            self.calculate_age()
+            fish_metadata = {
+            'fish_id': str(self.fish_id),
+            'line': self.fishline,
+            'condition': self.condition, 
+            'dob': self.dob, 
+            'age': self.age, 
+            }
+
+            metadata_path = Path(self.fish_folder / (str(self.fish_id) + '.json'))
+
+            with open(metadata_path, 'w') as file:
+                json.dump(fish_metadata, file)
+        
+        else:
+            print('Fish folder not found!')
 
     def close_thread(self):
         self.qthread.quit()
