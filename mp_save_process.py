@@ -18,9 +18,7 @@ import ctypes
 from video_writer import FFMPEG_VideoWriter_CPU_Grayscale
 from pathlib import Path
 
-# TODO: revisit q-value 
-# TODO: metadata structure 
-# TODO: update output directory handling 
+#TODO: check frame count for each trial 
 
 class SaveProcess(Process):
     def __init__(self, 
@@ -36,20 +34,24 @@ class SaveProcess(Process):
         self.start_event = start_event
         self.terminate_event = terminate_event
 
+        self.codec = 'h264'
+        self.q = 10
+        self.profile = 'high'
+
         self.fish_id = None
         self.active = True
 
-        self.metadata = False
+        self.metadata = 0
 
     def get_params(self):
         msg = self.back_pipe_save.recv()
-        print(f'Process {self.name} received {msg}')
+        # print(f'Process {self.name} received {msg}')
 
         if isinstance(msg, dict):
             for attr, param in msg.items():
                 value = param['value']
                 setattr(self, attr, value)
-                print(f'save: {attr}, {value}')
+                # print(f'save: {attr}, {value}')
 
         elif msg == 'terminate':
             self.terminate()
@@ -67,10 +69,10 @@ class SaveProcess(Process):
                                        self.video_name))
             self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
                                                                  width=self.width,
-                                                                 codec='h264',
+                                                                 codec=self.codec,
                                                                  fps=self.framerate,
-                                                                 q=10,
-                                                                 profile='high',
+                                                                 q=self.q,
+                                                                 profile=self.profile,
                                                                  preset='ultrafast',
                                                                  filename=self.video_path + '.mp4')
             
@@ -96,7 +98,7 @@ class SaveProcess(Process):
         # self.termination_event.set()
 
     def generate_trial_metadata(self):
-        if self.metadata:
+        if self.metadata == 2: #checkbox state; 0=unchecked, 2=checked
             trial_metadata = {
                 'fish_id': self.fish_id,
                 'trial_index': self.trial_index,
@@ -106,9 +108,9 @@ class SaveProcess(Process):
                 'gain': self.gain,
                 'frame_width': self.width, 
                 'frame_height': self.height, 
-                'codec': self.video_writer.codec, 
-                'q': self.video_writer.q,
-                'profile': self.video_writer.profile,
+                'codec': self.codec, 
+                'q': self.q,
+                'profile': self.profile,
                 'video_filename': self.filename
                 }
 
@@ -123,7 +125,10 @@ class SaveProcess(Process):
             if self.terminate_event.is_set():
                 break 
             self.init_videowriter()
-            fd = open('save_frames_AQ_250.txt', 'w')
+            frame_count_filename = 'save_frames' + str(self.trial_index) + '.txt'
+            frame_count_path = Path(self.output_dir) / self.fish_id / self.stim_folder
+            frame_count_filepath = frame_count_path / frame_count_filename
+            fd = open(str(frame_count_filepath), 'w')
             # video_start_time_3 = time.perf_counter_ns()
             # print(f'video_start_time_3: {video_start_time_3}')
 
@@ -134,7 +139,7 @@ class SaveProcess(Process):
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                 else: 
                     self.release_file()
-                    # self.generate_trial_metadata()
+                    self.generate_trial_metadata()
                     fd.close()
                     break
             print('File saving finished')
