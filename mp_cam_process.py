@@ -72,7 +72,6 @@ class CameraProcess(Process):
 
     def start_acquisition(self):
         self.camera.start_acquisition()
-        # self.start_event.set()
     
     def stop_acquisition(self):
         self.camera.stop_acquisition()
@@ -94,7 +93,7 @@ class CameraProcess(Process):
             self.back_pipe_cam.send(updated_cam_params)
 
         elif isinstance(msg, dict):
-            print(f'Params received by CameraProcess: {msg}')
+            # print(f'Params received by CameraProcess: {msg}')
             for attr, param in msg.items():
                 value = param['value']
                 setattr(self, attr, value)
@@ -107,7 +106,7 @@ class CameraProcess(Process):
     def display_mode(self):
         self.start_acquisition()
         self.previous_qsize = -1
-        fd = open('cam_frames_AQ_250_display.txt', 'w')
+        # fd = open('cam_frames_AQ_250_display.txt', 'w')
         while self.start_event.is_set():
             if self.back_pipe_cam.poll():
                 self.update()
@@ -115,43 +114,44 @@ class CameraProcess(Process):
                 frame = self.camera.get_frame()
                 if frame is not None:
                     self.display_buffer.put(frame)
-                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    # fd.write(f"{frame['index']}, {frame['timestamp']}\n")
             
-                self.current_qsize = self.display_buffer.qsize()
-                if self.current_qsize != self.previous_qsize:
-                    print(f'cam buffer queue size: {self.current_qsize}')
-                    self.previous_qsize = self.current_qsize
+                # self.current_qsize = self.display_buffer.qsize()
+                # if self.current_qsize != self.previous_qsize:
+                #     print(f'cam buffer queue size: {self.current_qsize}')
+                #     self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()
-        fd.close()
+        # fd.close()
         self.mode = None
         print('Acquisition stopped, exiting display mode')
 
     def save_mode(self):
         self.start_acquisition()
         # self.previous_qsize = -1
-        fs = open('cam_frames_AQ_250_save.txt', 'w')
-        fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
+        # fs = open('cam_frames_AQ_250_save.txt', 'w')
+        # fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
         frame_count = 0
         while self.start_event.is_set():
             frame = self.camera.get_frame()
             if frame is not None:
                 frame_count += 1
                 self.save_buffer.put(frame)
-                fs.write(f"{frame['index']}, {frame['timestamp']}\n")
+                # fs.write(f"{frame['index']}, {frame['timestamp']}\n")
                 if frame_count >= self.frame_interval:
                 # if frame_count % 10 == 0:
                     self.display_buffer.put(frame)
-                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    # fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                     frame_count = 0
             
             # self.current_qsize = self.save_buffer.qsize()
             # if self.current_qsize != self.previous_qsize:
             #     print(f'save buffer queue size: {self.current_qsize}')
             #     self.previous_qsize = self.current_qsize
+
         self.stop_acquisition()
-        fs.close()
-        fd.close()
+        # fs.close()
+        # fd.close()
         self.mode = None
         print('Acquisition stopped, exiting save mode')
 
@@ -160,7 +160,6 @@ class CameraProcess(Process):
         # winmm.timeBeginPeriod(1)
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
         self.init_cam()
-        # self.start_acquisition()
         while not self.terminate_event.is_set():
             self.update()
             if self.mode == 'display':

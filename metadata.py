@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-# check if time.perf_counter_ns() is system wide 
 
 class Metadata(QWidget):
     

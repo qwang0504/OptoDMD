@@ -42,7 +42,7 @@ class MessageRelay(Process):
 
             elif msg == 'start_recording':
                 save_params = self.back_pipe_gui.recv()
-                print(f'save params from MessageRelay: {save_params}')
+                # print(f'save params from MessageRelay: {save_params}')
                 self.front_pipe_save.send(save_params)
                 self.front_pipe_cam.send(save_params)
                 self.front_pipe_cam.send('save')

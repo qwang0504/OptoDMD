@@ -21,8 +21,6 @@ from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
 from metadata import Metadata
 from PyQt5.QtWidgets import QApplication
 
-# TODO: fix metadata has no output_dir
-# TODO: fix layout for new widgets
 # TODO: check arrayqueue length
 # TODO: PWM duty cycle not precise
 
@@ -143,7 +141,8 @@ if __name__ == "__main__":
     masks.mask_expose.connect(dmd_mask.expose)
     stim_manager.mask_expose.connect(dmd_mask.expose)
     masks.clear_dmd.connect(dmd_mask.clear)
-    camera_widget.terminate_pressed.connect(stim_manager.stop)
+    camera_widget.fish_folder_generated.connect(stim_manager.set_fish_folder)
+    # camera_widget.terminate_pressed.connect(stim_manager.stop)
     stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
     stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
     stim_manager.trial_started.connect(camera_widget.start_recording)

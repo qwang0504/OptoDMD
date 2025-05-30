@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 
 dtype = [('index', int), ('timestamp', np.float32)]
 
-cam = np.loadtxt(r'E:/automation_test/cam_frames_AQ_250_save_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
-save = np.loadtxt(r'E:/automation_test/save_frames_AQ_250_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
+cam = np.loadtxt('cam_frames_AQ_250_save.txt', delimiter=',', dtype=dtype)
+save = np.loadtxt('save_frames_AQ_250.txt', delimiter=',', dtype=dtype)
 display = np.loadtxt(r'E:/automation_test/cam_frames_AQ_250_display_ds_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
-fps = 250
+fps = 200
 
 plt.plot(np.diff(cam['timestamp']))
 plt.plot(np.diff(save['timestamp']))
