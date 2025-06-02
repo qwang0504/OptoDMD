@@ -18,7 +18,6 @@ import ctypes
 from video_writer import FFMPEG_VideoWriter_CPU_Grayscale
 from pathlib import Path
 
-#TODO: check frame count for each trial 
 
 class SaveProcess(Process):
     def __init__(self, 
@@ -102,6 +101,7 @@ class SaveProcess(Process):
             trial_metadata = {
                 'fish_id': self.fish_id,
                 'trial_index': self.trial_index,
+                'stim_number': self.stim_number,
                 'video_start': self.video_start_time,
                 'fps': self.framerate,
                 'exposure': self.exposure,
