@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 
 dtype = [('index', int), ('timestamp', np.float32)]
 
-cam = np.loadtxt('cam_frames_AQ_250_save.txt', delimiter=',', dtype=dtype)
+cam = np.loadtxt(r'E:/automation_test/20250530001/stim8/save_frames4.txt', delimiter=',', dtype=dtype)
 save = np.loadtxt('save_frames_AQ_250.txt', delimiter=',', dtype=dtype)
 display = np.loadtxt(r'E:/automation_test/cam_frames_AQ_250_display_ds_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
-fps = 200
+fps = 250
 
 plt.plot(np.diff(cam['timestamp']))
 plt.plot(np.diff(save['timestamp']))
@@ -80,3 +80,96 @@ video_start_2 = 64687484200
 first_recorded = 69238077600
 ((first_recorded - video_start) / 10**9)*fps # = 674, observed = 667
 ((first_recorded - video_start_2) / 10**9)*fps # = 1137, observed = 667 
+
+
+### For 20250530001 stim8 
+fps = 250
+
+recorded_starts = np.array([68717632500.0, 87737010400.0, 106770563000.0, 125804177500.0])
+recorded_ends =  np.array([69721312900.0, 88754982300.0, 107788668200.0, 126821537400.0])
+recorded_durations = np.array([1003680400.0, 1017971900.0, 1018105200.0, 1017359900.0])
+
+# trial 1
+video_start = 65707332200
+(((recorded_starts[0] - video_start) / 10**9)*fps).round() # = 753, observed = 743
+
+# trial 2
+video_start = 84719056100
+(((recorded_starts[1] - video_start) / 10**9)*fps).round() # = 754, observed = 746
+
+# trial 3
+video_start = 103755815500
+(((recorded_starts[2] - video_start) / 10**9)*fps).round() # = 754, observed = 746
+
+# trial 4
+video_start = 122780269100
+(((recorded_starts[3] - video_start) / 10**9)*fps).round() # = 756, observed = 750
+
+
+### For 20250530001 stim7
+fps = 200
+
+recorded_starts = np.array([349612291600.0, 368637185100.0, 387678755800.0, 406712208700.0, 425738110400.0, 444765503200.0])
+recorded_ends = np.array([350116236700.0, 369147349700.0, 388187976600.0, 407221398300.0, 426250289000.0, 445270446000.0])
+recorded_durations = np.array([503945100.0, 510164600.0, 509220800.0, 509189600.0, 512178600.0, 504942800.0])
+
+# trial 1
+video_start = 346609572200
+(((recorded_starts[0] - video_start) / 10**9)*fps).round() # = 601, observed = 594
+
+# trial 2
+video_start = 365626992600
+(((recorded_starts[1] - video_start) / 10**9)*fps).round() # = 602, observed = 596
+
+# trial 3
+video_start = 384661641300
+(((recorded_starts[2] - video_start) / 10**9)*fps).round() # = 603, observed = 597
+
+# trial 4
+video_start = 403697737600
+(((recorded_starts[3] - video_start) / 10**9)*fps).round() # = 603, observed = 598
+
+# trial 5
+video_start = 422720083800
+(((recorded_starts[4] - video_start) / 10**9)*fps).round() # = 604, observed = 599
+
+# trial 6
+video_start = 441759247400
+(((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 601, observed = 596
+
+
+
+### For 20250530001 stim6
+fps = 200
+
+recorded_starts = np.array([102373080300.0, 121417381300.0, 140450793200.0, 159484559400.0, 178517921500.0, 197551458800.0])
+recorded_ends = np.array([103386369400.0, 122426544100.0, 141468583900.0, 160502279200.0, 179535769000.0, 198568800300.0])
+recorded_durations = np.array([1013289100.0, 1009162800.0, 1017790700.0, 1017719800.0, 1017847500.0, 1017341500.0])
+
+# trial 1
+video_start = 99367103100
+(((recorded_starts[0] - video_start) / 10**9)*fps).round() # = 601, observed = 595
+
+# trial 2
+video_start = 118399745100
+(((recorded_starts[1] - video_start) / 10**9)*fps).round() # = 604, observed = 597
+
+# trial 3
+video_start = 137436608600
+(((recorded_starts[2] - video_start) / 10**9)*fps).round() # = 603, observed = 596
+
+# trial 4
+video_start = 156468991800
+(((recorded_starts[3] - video_start) / 10**9)*fps).round() # = 603, observed = 596
+
+# trial 5
+video_start = 175501518600
+(((recorded_starts[4] - video_start) / 10**9)*fps).round() # = 603, observed = 598
+
+# trial 6
+video_start = 194540343400
+(((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 602, observed = 598
+
+
+### over 12 trials at 200fps, ~29ms difference between observed and recorded i.e. 6 frames at 200fps 
+

@@ -21,7 +21,6 @@ import json
 # TODO: add reminder to click Enter after file input 
 # TODO: why does video start time at main process start after start time at save process???
 # TODO: check display buffer size, stop acquisition queue.Full problem
-# TODO: Check what checkbox state is! printing metadata, 2 for some reason 
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
