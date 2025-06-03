@@ -18,8 +18,6 @@ import json
 
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
-# TODO: add reminder to click Enter after file input 
-# TODO: why does video start time at main process start after start time at save process???
 # TODO: check display buffer size, stop acquisition queue.Full problem
 
 class DisplayWorker(QObject):
@@ -396,8 +394,7 @@ class CameraWidget(QWidget):
         for widget in self.findChildren(QWidget):
             widget.setEnabled(True)
 
-    def toggle_widgets(self, state):
-        print(f'checkbox state: {state}')
+    def toggle_widgets(self, state): #0 or 2
         self.fish_number_spinbox.setVisible(state)
         self.generate_folder_button.setVisible(state)
         self.adjustSize()
@@ -458,13 +455,15 @@ class CameraWidget(QWidget):
         # self.age = today_qdate.daysTo(dob)
         self.age = dob.daysTo(today_qdate) - 1
         self.dpf_label.setText(f'Days post-fertilisation: {self.age}')
-        print(self.age)
+        # print(self.age)
 
     def set_fishline(self):
         self.fishline = self.fishline_input.text()
+        self.fishline_input.clearFocus()
 
     def set_condition(self):
         self.condition = self.condition_input.text()
+        self.condition_input.clearFocus()
 
     def generate_fish_metadata(self):
         if self.fish_folder:

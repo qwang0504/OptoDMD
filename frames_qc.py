@@ -171,5 +171,73 @@ video_start = 194540343400
 (((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 602, observed = 598
 
 
-### over 12 trials at 200fps, ~29ms difference between observed and recorded i.e. 6 frames at 200fps 
 
+### For 20250530001 stim5
+fps = 250
+
+recorded_starts = np.array([341921608700.0, 360946079300.0, 379980610800.0, 399016653000.0, 418055035200.0, 437098582800.0])
+recorded_ends = np.array([342930906900.0, 361963618700.0, 380993218100.0, 400022040400.0, 419074604100.0, 438106551700.0])
+
+# trial 1
+video_start = 338905998300
+(((recorded_starts[0] - video_start) / 10**9)*fps).round() # = 754, observed = 744
+
+# trial 2
+video_start = 357929417500
+(((recorded_starts[1] - video_start) / 10**9)*fps).round() # = 754, observed = 747
+
+# trial 3
+video_start = 376972539300
+(((recorded_starts[2] - video_start) / 10**9)*fps).round() # = 752, observed = 744
+
+# trial 4
+video_start = 396009203200
+(((recorded_starts[3] - video_start) / 10**9)*fps).round() # = 752, observed = 745
+
+# trial 5
+video_start = 415038715200
+(((recorded_starts[4] - video_start) / 10**9)*fps).round() # = 754, observed = 747
+
+# trial 6
+video_start = 434087207200
+(((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 753, observed = 746
+
+### over 12 trials at 200fps, ~29ms difference between observed and recorded i.e. 6 frames at 200fps 
+### over 16 trials at 250fps, ~31ms difference between observed and recorded i.e. 8 frames at 250fps 
+
+
+### For 20250603001 stim5
+fps = 250
+
+recorded_starts = np.array([108764510100.0, 127799864300.0, 146840187500.0, 165871541200.0, 184917879300.0, 203956236200.0])
+recorded_ends = np.array([109781578100.0, 128806907100.0, 147847909000.0, 166879178900.0, 185922973600.0, 204960618700.0])
+
+# trial 1
+video_start = 105748414600
+(((recorded_starts[0] - video_start) / 10**9)*fps).round() # = 754, observed = 746
+
+video_start_time_CAM = 103892098400
+video_start_time_SAVE = 103888541200
+
+(((recorded_starts[0] - video_start_time_CAM) / 10**9)*fps).round()
+(((recorded_starts[0] - video_start_time_SAVE) / 10**9)*fps).round()
+
+# trial 2
+video_start = 124787636100
+(((recorded_starts[1] - video_start) / 10**9)*fps).round() # = 753, observed = 745
+
+# trial 3
+video_start = 143820619400
+(((recorded_starts[2] - video_start) / 10**9)*fps).round() # = 755, observed = 745
+
+# trial 4
+video_start = 162858194700
+(((recorded_starts[3] - video_start) / 10**9)*fps).round() # = 753, observed = 745
+
+# trial 5
+video_start = 181903106100
+(((recorded_starts[4] - video_start) / 10**9)*fps).round() # = 754, observed = 748
+
+# trial 6
+video_start = 200931928500
+(((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 756, observed = 747

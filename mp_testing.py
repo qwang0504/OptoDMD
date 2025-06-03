@@ -140,9 +140,6 @@ if __name__ == "__main__":
                                  display_buffer=display_buffer,
                                  save_buffer=save_buffer,
                                  sentinel_array=sentinel)
-    
-    # metadata = Metadata(stim_manager=stim_manager,
-    #                     camera_widget=camera_widget)
 
     # Connect signals and slots
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
@@ -156,8 +153,6 @@ if __name__ == "__main__":
     stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
     stim_manager.trial_started.connect(camera_widget.start_recording)
     stim_manager.trial_ended.connect(camera_widget.stop_recording)
-
-    # stim_manager.launch_metadata.connect(metadata.initialise_widget)
 
     camera_widget.show()
 

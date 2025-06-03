@@ -132,10 +132,14 @@ class CameraProcess(Process):
         # fs = open('cam_frames_AQ_250_save.txt', 'w')
         # fd = open('cam_frames_AQ_250_display_ds.txt', 'w')
         frame_count = 0
+        # first_frame = 0
         while self.start_event.is_set():
             frame = self.camera.get_frame()
+            # if first_frame == 0:
+                # print(f'video_start_time_CAM = {(time.perf_counter_ns())}')
             if frame is not None:
                 frame_count += 1
+                # first_frame += 1
                 self.save_buffer.put(frame)
                 # fs.write(f"{frame['index']}, {frame['timestamp']}\n")
                 if frame_count >= self.frame_interval:

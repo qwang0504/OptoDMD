@@ -77,8 +77,6 @@ class SaveProcess(Process):
             
         else:
             self.video_name = self.filename 
-            # video_start_time_2 = time.perf_counter_ns()
-            # print(f'video_start_time_2: {video_start_time_2}')
             self.video_path = str(Path(self.output_dir, self.video_name))
             self.video_writer = FFMPEG_VideoWriter_CPU_Grayscale(height=self.height,
                                                                 width=self.width,
@@ -129,14 +127,16 @@ class SaveProcess(Process):
             frame_count_path = Path(self.output_dir) / self.fish_id / self.stim_folder
             frame_count_filepath = frame_count_path / frame_count_filename
             fd = open(str(frame_count_filepath), 'w')
-            # video_start_time_3 = time.perf_counter_ns()
-            # print(f'video_start_time_3: {video_start_time_3}')
-
+            
+            frame_count = 0
             while self.active:
                 frame = self.save_buffer.get()
+                if frame_count == 0:
+                    print(f'video_start_time_SAVE = {time.perf_counter_ns()}')
                 if frame['image'].sum() > 0:
                     self.video_writer.write_frame(frame['image'])
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    frame_count += 1
                 else: 
                     self.release_file()
                     self.generate_trial_metadata()
