@@ -25,6 +25,7 @@ from PyQt5.QtCore import QThreadPool
 # TODO: check arrayqueue length
 # TODO: PWM duty cycle not precise
 # TODO: test triggering with zeromq
+# TODO: implement listening class to handle zeromq messages 
 # TODO: test triggering with labjack  
 
 if __name__ == "__main__":
