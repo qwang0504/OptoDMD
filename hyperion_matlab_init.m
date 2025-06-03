@@ -2,8 +2,8 @@
 optoDMD_folder='C:\Users\wangqing\Code\OptoDMD';
 zeromq_jar_path = 'C:\Users\wangqing\Code\OptoDMD\jeromq-0.6.0.jar';
 zeromq_protocol = "tcp://";
-zeromq_host = "*";
-zeromq_port = 5555;
+zeromq_host = "localhost";
+zeromq_port_frames = 5002;
 channel = 1;
 
 % add scanimage path
@@ -15,4 +15,4 @@ cd(optoDMD_folder)
 
 % run scanimage
 scanimage
-ipc = frameDoneIPC(zeromq_jar_path, zeromq_protocol, zeromq_host, zeromq_port, channel);
+ipc = frameDoneIPC(zeromq_jar_path, zeromq_protocol, zeromq_host, zeromq_port_frames, channel);

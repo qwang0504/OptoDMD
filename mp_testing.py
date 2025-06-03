@@ -18,20 +18,23 @@ from daq import LabJackU3LV_hl
 from LED import LEDWidget, LEDD1B
 from DMD import DMD
 from DrawMasks import DrawPolyMask, DrawPolyMaskOpto, DrawPolyMaskOptoDMD
-from metadata import Metadata
+from Microscope import ImageSender, ScanImage
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QThreadPool
 
 # TODO: check arrayqueue length
 # TODO: PWM duty cycle not precise
+# TODO: test triggering with zeromq
+# TODO: test triggering with labjack  
 
 if __name__ == "__main__":
 
     height = 488
     width = 648
 
-    PROTOCOL = "ipc://"
+    PROTOCOL = "tcp://"
     HOST = "localhost"
-    PORT = 5000
+    PORT = 5002
 
     # dmd settings
     SCREEN_DMD = 2
@@ -103,6 +106,12 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
 
+    # Communication with ScanImage
+    scan_image = ScanImage(PROTOCOL, HOST, PORT)
+    twop_sender = ImageSender(scan_image)
+    thread_pool = QThreadPool()
+    thread_pool.start(twop_sender)
+
     # Control LEDs
     daio = LabJackU3LV_hl()
     led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "475 nm") 
@@ -136,7 +145,7 @@ if __name__ == "__main__":
     #                     camera_widget=camera_widget)
 
     # Connect signals and slots
-    # connect signals and slots
+    twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
     dmd_mask.DMD_update.connect(dmd_widget.update_image)
     masks.mask_expose.connect(dmd_mask.expose)
     stim_manager.mask_expose.connect(dmd_mask.expose)
@@ -155,7 +164,8 @@ if __name__ == "__main__":
 
     app.exec()
 
+    twop_sender.stop()
+
     camera_process.join()
     relay_process.join()
     save_process.join()
-
