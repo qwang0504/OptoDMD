@@ -138,9 +138,9 @@ class SaveProcess(Process):
                     fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                     frame_count += 1
                 else: 
+                    fd.close()
                     self.release_file()
                     self.generate_trial_metadata()
-                    fd.close()
                     break
             print('File saving finished')
 

@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 
 dtype = [('index', int), ('timestamp', np.float32)]
 
-cam = np.loadtxt(r'E:/automation_test/20250530001/stim8/save_frames4.txt', delimiter=',', dtype=dtype)
+cam = np.loadtxt(r'E:/automation_test/20250606001/stim3/save_frames1.txt', delimiter=',', dtype=dtype)
 save = np.loadtxt('save_frames_AQ_250.txt', delimiter=',', dtype=dtype)
 display = np.loadtxt(r'E:/automation_test/cam_frames_AQ_250_display_ds_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
 fps = 250
 
 plt.plot(np.diff(cam['timestamp']))
-plt.plot(np.diff(save['timestamp']))
-plt.plot(np.diff(display['timestamp']))
+# plt.plot(np.diff(save['timestamp']))
+# plt.plot(np.diff(display['timestamp']))
 plt.show()
 
 print(np.where(np.diff(cam['index']) > 1))
@@ -241,3 +241,72 @@ video_start = 181903106100
 # trial 6
 video_start = 200931928500
 (((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 756, observed = 747
+
+
+### For 20250606001 stim1 -> 62 second videos
+
+fps = 250
+
+recorded_starts = np.array([173100371900.0, 257139379100.0, 341179228400.0, 425228670500.0])
+recorded_ends = np.array([174105953600.0, 258145689800.0, 342186988800.0, 426235205900.0])
+
+# trial 1
+# 2 frame drop at 3919
+video_start_time = 170085831100
+
+(((recorded_starts[0] - video_start_time) / 10**9)*fps).round() # = 754, observed = 745
+
+# trial 2
+# no drops
+video_start_time = 254120173800
+
+(((recorded_starts[1] - video_start_time) / 10**9)*fps).round() # = 755, observed = 747
+
+# trial 3
+# no drops
+video_start_time = 338157652900
+
+(((recorded_starts[2] - video_start_time) / 10**9)*fps).round() # = 755, observed = 747
+
+# trial 4
+# no drops
+video_start_time = 422208768700
+
+(((recorded_starts[3] - video_start_time) / 10**9)*fps).round() # = 755, observed = 747
+
+
+### For 20250606001 stim2 -> 300 second videos
+
+fps = 250
+
+recorded_starts = np.array([359135273600.0, 673208976100.0, 987254137000.0, 1301288377400.0])
+recorded_ends = np.array([360141816400.0, 674216617900.0, 988262207000.0, 1302295627900.0])
+
+# trial 1
+# no drops
+video_start_time = 356113641200
+
+(((recorded_starts[0] - video_start_time) / 10**9)*fps).round() # = 755, observed = 747
+
+# trial 2
+# no drops
+video_start_time = 670158430500
+
+(((recorded_starts[1] - video_start_time) / 10**9)*fps).round() # = 763, observed = 754
+
+
+# trial 3
+# no drops
+video_start_time = 984232828800
+
+(((recorded_starts[2] - video_start_time) / 10**9)*fps).round() # = 755, observed = 747
+
+
+# trial 4
+# no drops
+video_start_time = 1298279872200
+
+(((recorded_starts[3] - video_start_time) / 10**9)*fps).round() # = 752, observed = 744
+
+# 32 msec difference
+

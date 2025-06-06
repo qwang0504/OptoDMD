@@ -5,6 +5,9 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, QRunnable, QThreadPool, QObject
 from PyQt5.QtWidgets import QLabel,  QWidget
 from qt_widgets import NDarray_to_QPixmap
 from image_tools import im2uint8
+import time
+
+# TODO: Pause is not working 
 
 def deserialize(message: str) -> NDArray:
     '''deserialize string into numpy array'''
@@ -41,12 +44,19 @@ class ImageSender(QRunnable):
         
         self.scan_image = scan_image
         self.keepgoing = True
+        # self.is_paused = False
     
     def stop(self):
         self.keepgoing = False
+    
+    # def pause(self):
+    #     self.is_paused = True
 
     def run(self):
         while self.keepgoing:
+            # if self.is_paused:
+            #     time.sleep(1)
+            #     continue
             image = self.scan_image.get_image()
             self.scan_image.image_ready.emit(image)
 

@@ -10,12 +10,12 @@ import numpy as np
 import copy
 import json
 
-# TODO: think about if this needs to run on a separate process
 # TODO: check if time.perf_counter_ns() / windows high-res timer works better
 # TODO: update method without shuffle
 # TODO: disable everything except stop button when running?
 # TODO: implement terminate method 
-# TODO: decide on 0-based or 1-based indexing for trials 
+# TODO: checkbox for receiving trigger from scanimage 
+# TODO: rethink interval calculation
 
 class StimManager(QWidget):
 
@@ -76,6 +76,7 @@ class StimManager(QWidget):
         self.rep_spinbox.setValue(1)
 
         self.interval_spinbox = LabeledSpinBox(self)
+        self.interval_spinbox.setRange(0, 9999)
         self.interval_spinbox.setText('Interval duration (s)')
         self.interval_spinbox.setValue(0)
         self.interval_spinbox.valueChanged.connect(self.set_interval)
@@ -138,7 +139,7 @@ class StimManager(QWidget):
 
         self.recording_duration_input = LabeledSpinBox(self)
         self.recording_duration_input.setText('Duration of recording (s)')
-        self.recording_duration_input.setRange(0, 999)
+        self.recording_duration_input.setRange(0, 9999)
         self.recording_duration_input.setSingleStep(1)
         self.recording_duration_input.setValue(10)
 
@@ -268,6 +269,7 @@ class StimManager(QWidget):
         self.start_stim = StartStim(stim_manager=self, 
                                     led_driver=self.led_driver) 
         self.thread_pool.start(self.start_stim)
+        self.stim_started.emit()
 
     def stop(self):
         self.start_stim.active = False

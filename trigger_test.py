@@ -18,3 +18,9 @@ d.getFeedback(u3.BitStateRead(0))
 d.getFeedback(u3.BitStateWrite(0, 1))
 time.sleep(1)
 d.getFeedback(u3.BitStateWrite(0, 0))
+
+
+#F1O2 red pmt!
+d.getFeedback(u3.BitDirWrite(2, 1))
+d.getFeedback(u3.BitStateWrite(2, 0))
+
