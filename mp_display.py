@@ -15,6 +15,7 @@ import copy
 from datetime import datetime
 from pathlib import Path
 import json
+import zmq
 
 # TODO: check if it's better to reuse QThread with event.wait()
 # TODO: add high-res timers
@@ -42,7 +43,7 @@ class DisplayWorker(QObject):
         # print(f'QThread ID: {int(QThread.currentThreadId())}')
         previous_qsize = -1
         while self.active:
-            current_qsize = self.display_buffer.qsize()
+            # current_qsize = self.display_buffer.qsize()
 
             self.frame = self.display_buffer.get() #blocking
             if self.frame['image'].sum() > 0:
@@ -51,25 +52,92 @@ class DisplayWorker(QObject):
                 print('DisplayWorker received sentinel')
                 self.terminate()
             
-            if current_qsize != previous_qsize:
-                print(f'Display buffer queue size: {current_qsize}')
-                previous_qsize = current_qsize
+            # if current_qsize != previous_qsize:
+            #     print(f'Display buffer queue size: {current_qsize}')
+            #     previous_qsize = current_qsize
         
         print('DisplayWorker finished, exiting')
+
+
+class ZMQ_worker(QObject):
+    triggered = pyqtSignal()
+    aborted = pyqtSignal()
+    
+    def __init__(self, 
+                 *args,
+                 address: str,
+                 timeout = None,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.active = True
+        self.address = address
+        self.timeout = timeout
+
+    def setup(self):
+        self.context = zmq.Context.instance()
+        self.socket = self.context.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.SUBSCRIBE, b"")
+        self.socket.connect(self.address)
+        print(f'Socket connected to {self.address}')
+
+    def terminate(self):
+        self.active = False
+        self.socket.close() 
+        self.context.term()
+
+    def check(self):
+        try:
+            if self.socket.poll(0):
+                ret = self.socket.recv()
+                if ret == 'start':
+                    print("start trigger received")
+                    self.triggered.emit()
+                elif ret == 'stop':
+                    print('stop trigger received')
+                    self.aborted.emit()
+
+        except zmq.error.ZMQError:
+            pass
+
+    def check_blocking(self):
+        try:
+            if self.socket.poll(-1):
+                ret = self.socket.recv()
+                if ret:
+                    print("trigger received")
+                    self.triggered.emit()
+        except zmq.error.ZMQError:
+            pass
+
+    def run(self):
+        self.setup()
+        while self.active: 
+            if self.timeout:
+                self.check()
+            else: 
+                self.check_blocking()
+        self.terminate()
+        print('ZMQ_worker finished, exiting')
 
 
 class CameraWidget(QWidget):
 
     record_started = pyqtSignal(int)
     record_stopped = pyqtSignal(int)
-    terminate_pressed = pyqtSignal()
+    terminate_all = pyqtSignal()
     fish_folder_generated = pyqtSignal(str, str)
+    zmq_trigger = pyqtSignal()
+    zmq_abort = pyqtSignal()
 
     def __init__(self, 
                  front_pipe_gui: connection.Connection,
                  display_buffer: ArrayQueue,
                  save_buffer: ArrayQueue,
                  sentinel_array: np.ndarray,
+                 protocol: str,
+                 host: str, 
+                 port: int, 
                  *args, 
                  **kwargs):
         
@@ -81,8 +149,19 @@ class CameraWidget(QWidget):
         self.save_buffer = save_buffer
         self.sentinel_array = sentinel_array
 
+        self.address = protocol + host + ":" + str(port)
+
         self.worker = None
         self.qthread = None
+
+        self.zmq_worker = ZMQ_worker(address=self.address)
+        self.zmq_worker.triggered.connect(self.zmq_trigger)
+        self.zmq_worker.aborted.connect(self.zmq_abort)
+        self.qthread_trigger = QThread()
+        self.zmq_worker.moveToThread(self.qthread_trigger)
+        self.qthread_trigger.started.connect(self.zmq_worker.run)
+        self.qthread_trigger.start()
+        self.terminate_all.connect(self.zmq_worker.terminate)
 
         self.acquisition_started = False
 
@@ -237,6 +316,7 @@ class CameraWidget(QWidget):
         self.generate_fish_metadata_button = QPushButton(self)
         self.generate_fish_metadata_button.setText('Create fish metadata')
         self.generate_fish_metadata_button.clicked.connect(self.generate_fish_metadata)
+        self.generate_fish_metadata_button.hide()
 
 
     def layout_components(self):
@@ -335,11 +415,11 @@ class CameraWidget(QWidget):
             self.save_buffer.put(self.sentinel_array)
             self.close_thread()
             self.front_pipe_gui.send('terminate')
-            self.terminate_pressed.emit()
+            self.terminate_all.emit()
         else:
             print('DisplayWorker / QThread undefined, nothing to terminate')
             self.front_pipe_gui.send('terminate')
-            self.terminate_pressed.emit()
+            self.terminate_all.emit()
 
     def update_display(self):
         try:
@@ -406,6 +486,7 @@ class CameraWidget(QWidget):
         self.dpf_label.setVisible(state)
         self.fishline_input.setVisible(state)
         self.condition_input.setVisible(state)
+        self.generate_fish_metadata_button.setVisible(state)
         self.adjustSize()
 
     def select_directory(self):

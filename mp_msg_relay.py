@@ -2,6 +2,8 @@ from multiprocessing import Process, Pipe, Queue, connection, Event
 import time
 from queue import Empty
 from arrayqueues import ArrayQueue
+import zmq
+from PyQt5.QtCore import QObject, pyqtSignal
 # from ipc_tools import RingBuffer, Logger, ModifiableRingBuffer
 
 
@@ -10,6 +12,7 @@ class MessageRelay(Process):
                  back_pipe_gui: connection.Connection,
                  front_pipe_cam: connection.Connection,
                  front_pipe_save: connection.Connection,
+                #  front_pipe_zmq: connection.Connection,
                  start_event,
                  terminate_event,
                  *args, **kwargs):
@@ -19,6 +22,7 @@ class MessageRelay(Process):
         self.back_pipe_gui = back_pipe_gui
         self.front_pipe_cam = front_pipe_cam
         self.front_pipe_save = front_pipe_save
+        # self.front_pipe_zmq = front_pipe_zmq
 
         self.start_event = start_event
         self.terminate_event = terminate_event
@@ -26,10 +30,13 @@ class MessageRelay(Process):
         self.camera_process = None
         self.active = True
 
-
     def run(self):
         print(f"Process: {self.name}, ID: {self.pid} is starting...")
         while self.active:
+            # if self.front_pipe_zmq.poll(0):
+            #     trigger = self.front_pipe_zmq.recv()
+            #     print('trigger received by MessageRelay')
+
             msg = self.back_pipe_gui.recv()
             print(f"Process: {self.name} received {msg}")
             
@@ -46,7 +53,6 @@ class MessageRelay(Process):
                 self.front_pipe_save.send(save_params)
                 self.front_pipe_cam.send(save_params)
                 self.front_pipe_cam.send('save')
-
                 self.start_event.set()
 
             elif msg == 'stop_recording':
@@ -72,6 +78,71 @@ class MessageRelay(Process):
                     self.back_pipe_gui.send(updated_cam_params)
 
         print('MessageRelay finished, exiting')
+
+
+
+class ZMQ_signal(QObject):
+    triggered = pyqtSignal()
+
+
+
+class ZMQ_listener(Process):
+    def __init__(self,
+                 protocol: str,
+                 host: str,
+                 port: int,
+                 back_pipe_zmq: connection.Connection,
+                 timeout = None,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.address = protocol + host + ":" + str(port)
+        self.timeout = timeout
+        self.signal = ZMQ_signal()
+
+        self.active = True
+
+    def setup(self):
+        self.contex = zmq.Context.instance()
+        self.socket = self.contex.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.SUBSCRIBE, b"")
+        self.socket.connect(self.address)
+        print('Waiting for trigger...')
+
+    def check(self):
+        try:
+            #timeout = 0, non-blocking check 
+            if self.socket.poll(0): 
+                ret = self.socket.recv()
+                if ret:
+                    print("trigger received")
+                    self.signal.triggered.emit()
+        except zmq.error.ZMQError:
+            pass
+
+    def check_blocking(self):
+        try:
+            if self.socket.poll(-1):
+                ret = self.socket.recv()
+                if ret:
+                    print('trigger received')
+                    self.signal.triggered.emit()
+        
+        except zmq.error.ZMQError:
+            pass
+
+    def run(self):
+        print(f"Process: {self.name}, ID: {self.pid} is starting...")
+        self.setup()
+        while self.active:
+            if self.timeout: 
+                self.check_blocking()
+            else: 
+                self.check()
+
+        print('ZMQ_listener finished, exiting')
+
+
 
 
 

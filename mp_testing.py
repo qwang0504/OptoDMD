@@ -24,9 +24,9 @@ from PyQt5.QtCore import QThreadPool
 
 # TODO: check arrayqueue length
 # TODO: PWM duty cycle not precise
-# TODO: test triggering with zeromq
-# TODO: implement listening class to handle zeromq messages 
-# TODO: test triggering with labjack  
+# TODO: termination methods
+# TODO: close sockets cleanly
+# TODO: implement "reverse" PWM for PMT gating
 
 if __name__ == "__main__":
 
@@ -35,7 +35,8 @@ if __name__ == "__main__":
 
     PROTOCOL = "tcp://"
     HOST = "localhost"
-    PORT = 5002
+    SI_FRAMES_PORT = 5002
+    SI_TRIGGER_PORT = 6002
 
     # dmd settings
     SCREEN_DMD = 2
@@ -45,6 +46,7 @@ if __name__ == "__main__":
 
     # labjack settingss
     PWM_CHANNEL = 6
+    PMT_GATING_CHANNEL = 2
     
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
@@ -108,7 +110,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Communication with ScanImage
-    scan_image = ScanImage(PROTOCOL, HOST, PORT)
+    scan_image = ScanImage(PROTOCOL, HOST, SI_FRAMES_PORT)
     twop_sender = ImageSender(scan_image)
     thread_pool = QThreadPool()
     thread_pool.start(twop_sender)
@@ -140,7 +142,10 @@ if __name__ == "__main__":
     camera_widget = CameraWidget(front_pipe_gui=front_pipe_gui,
                                  display_buffer=display_buffer,
                                  save_buffer=save_buffer,
-                                 sentinel_array=sentinel)
+                                 sentinel_array=sentinel,
+                                 protocol=PROTOCOL,
+                                 host=HOST,
+                                 port=SI_TRIGGER_PORT)
 
     # Connect signals and slots
     twop_sender.scan_image.image_ready.connect(twop_mask.set_image)
@@ -150,13 +155,14 @@ if __name__ == "__main__":
     masks.clear_dmd.connect(dmd_mask.clear)
     camera_widget.fish_folder_generated.connect(stim_manager.set_fish_folder)
     # camera_widget.terminate_pressed.connect(stim_manager.stop)
+    camera_widget.zmq_trigger.connect(stim_manager.start)
+    # stim_manager.stim_started.connect(twop_sender.pause)
     stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
     stim_manager.trial_index_set.connect(camera_widget.set_trial_index)
     stim_manager.trial_started.connect(camera_widget.start_recording)
     stim_manager.trial_ended.connect(camera_widget.stop_recording)
 
     camera_widget.show()
-
 
     app.exec()
 
