@@ -3,7 +3,7 @@ import time
 from PyQt5.QtCore import QRunnable, QThreadPool, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QWidget
 from qt_widgets import LabeledSliderSpinBox, LabeledSpinBox
-from typing import Protocol, List
+from typing import Protocol, List, Optional
 
 class LEDDriver(Protocol):
     
@@ -21,10 +21,6 @@ class LEDDriver(Protocol):
 
 class PulseSender(QRunnable):
 
-    # pulse_start = pyqtSignal()
-    # pulse_end = pyqtSignal()
-    # pulse_duration = pyqtSignal()
-
     def __init__(
             self, 
             DAIO: DigitalAnalogIO, 
@@ -32,6 +28,7 @@ class PulseSender(QRunnable):
             pwm_channel: int,
             duty_cycle: float,
             pwm_frequency: int,
+            gating_channel: Optional[int] = None,
             *args, **kwargs):
 
         super().__init__(*args, **kwargs)
@@ -41,21 +38,45 @@ class PulseSender(QRunnable):
         self.pwm_channel = pwm_channel
         self.duty_cycle = duty_cycle
         self.pwm_frequency = pwm_frequency
+        self.gating_channel = gating_channel
 
     def run(self):
-        # self.time_start = time.time()
-        self.time_start = time.perf_counter_ns()
+
+        if self.gating_channel is not None:
+            self.time_start = time.monotonic_ns()
+            
+            self.DAIO.pwm_ttl(pwm_channel=self.pwm_channel, 
+                              gating_channel=self.gating_channel,
+                              duty_cycle=self.duty_cycle, 
+                              frequency=self.pwm_frequency)
+            
+            time.sleep(self.pulse_duration_ms/1000.0)
+            
+            self.DAIO.pwm_ttl(pwm_channel=self.pwm_channel, 
+                              gating_channel=self.gating_channel,
+                              duty_cycle=0, 
+                              frequency=self.pwm_frequency)
+
+            self.time_end = time.monotonic_ns()
+            print('start: ', self.time_start)
+            print('end: ', self.time_end)
+            self.duration = self.time_end - self.time_start
+            # print('duration: ', self.duration)
         
-        self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=self.duty_cycle, frequency=self.pwm_frequency)
-        time.sleep(self.pulse_duration_ms/1000.0)
-        
-        self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=0, frequency=self.pwm_frequency)
-        # self.time_end = time.time()
-        self.time_end = time.perf_counter_ns()
-        print('start: ', self.time_start)
-        print('end: ', self.time_end)
-        self.duration = self.time_end - self.time_start
-        print('duration: ', self.duration)
+        else: 
+            self.time_start = time.monotonic_ns()
+            
+            self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=self.duty_cycle, frequency=self.pwm_frequency)
+            
+            time.sleep(self.pulse_duration_ms/1000.0)
+            
+            self.DAIO.pwm(channel=self.pwm_channel, duty_cycle=0, frequency=self.pwm_frequency)
+
+            self.time_end = time.monotonic_ns()
+            print('start: ', self.time_start)
+            print('end: ', self.time_end)
+            self.duration = self.time_end - self.time_start
+            # print('duration: ', self.duration)
 
 
 class LEDD1B:
@@ -74,13 +95,15 @@ class LEDD1B:
             DAIO: DigitalAnalogIO, 
             pwm_frequency: float = 1000, 
             pwm_channel: int = 6,
-            name: str = 'LED'
+            name: str = 'LED',
+            gating_channel: Optional[int] = None,
         ) -> None:
 
         self.DAIO = DAIO
         self.name = name
         self.pwm_frequency = pwm_frequency
         self.pwm_channel = pwm_channel 
+        self.gating_channel = gating_channel
         self.intensity = 1
         self.started = False
         self.thread_pool = QThreadPool()
@@ -108,18 +131,30 @@ class LEDD1B:
         self.started = False
 
     def pulse(self, duration_ms: int = 1000):
+
         if self.started:
             raise RuntimeError('Already ON')
 
-        self.pulse_sender = PulseSender(
-            self.DAIO, 
-            duration_ms, 
-            self.pwm_channel, 
-            self.intensity, 
-            self.pwm_frequency
-            )
-        self.thread_pool.start(self.pulse_sender)
+        if self.gating_channel is not None:
+            self.pulse_sender = PulseSender(
+                DAIO=self.DAIO, 
+                pulse_duration_ms=duration_ms, 
+                pwm_channel=self.pwm_channel, 
+                duty_cycle=self.intensity, 
+                pwm_frequency=self.pwm_frequency,
+                gating_channel=self.gating_channel
+                )
+            self.thread_pool.start(self.pulse_sender)
 
+        else: 
+            self.pulse_sender = PulseSender(
+                DAIO=self.DAIO, 
+                pulse_duration_ms=duration_ms, 
+                pwm_channel=self.pwm_channel, 
+                duty_cycle=self.intensity, 
+                pwm_frequency=self.pwm_frequency
+                )
+            self.thread_pool.start(self.pulse_sender)
 
 
 class DriverWidget(QWidget):

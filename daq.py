@@ -12,6 +12,7 @@ import u3
 from pyfirmata import Arduino
 from typing import Protocol
 import time
+from typing import Optional
 
 class DigitalAnalogIO(Protocol):
 
@@ -226,7 +227,7 @@ class LabJackU3LV_hl:
         self.device.configIO(NumberOfTimersEnabled=0)
         #configure analog / digital with bitmask 
         self.device.configIO(FIOAnalog=0) #all digital 
-        self.device.getFeedback(u3.BitStateWrite(channel, state)) #defaults all to output 
+        self.device.getFeedback(u3.BitStateWrite(channel, state)) #defaults direction to output 
 
     def analogRead(self, channel: int) -> float:
         self.device.configIO(NumberOfTimersEnabled=0)        
@@ -273,13 +274,14 @@ class LabJackU3LV_hl:
         # make sure digital value is 0
         self.digitalWrite(channel,0)
         # why is this necessary? make sure that the channel isn't already sending a signal?
+        # it's to turn off the PWM pulse, since pwm() is called twice, once at the start at the pulse, then at the end
 
         if duty_cycle == 0:
             # PWM can't fully turn off. Use digital write instead
             # and return
             return
         
-        # divisor should be in the range 0-255, 0 corresponds to a divisor of 256
+        # divisor should be in the range 0-255, 0 corresponds to a divisor of 256  
         timer_clock_divisor = int( (self.clock_freq * 1e6)/(frequency * div) ) #48 MHz / (frequency * divisor)
         
         if timer_clock_divisor == 256: 
@@ -295,9 +297,67 @@ class LabJackU3LV_hl:
         value = int(65535*(1-duty_cycle))
 
         # Configure the timer for 16-bit PWM
-        time_start_pwm = time.perf_counter_ns()
+        time_start_pwm = time.monotonic_ns()
         self.device.getFeedback(u3.TimerConfig(timer=0, TimerMode=timer_mode, Value=value))
         print('start_pwm: ', time_start_pwm)
+
+    def pwm_ttl(self, pwm_channel: int, gating_channel: int, duty_cycle: float, frequency: float) -> None:
+        
+        if not (0 <= duty_cycle <= 1):
+            raise ValueError('duty_cycle should be between 0 and 1')
+
+        if frequency > 187_500:
+            raise ValueError('max frequency at 48MHz is 187_500 Hz')
+        elif frequency < 2.861:
+            raise ValueError('min frequency at 48MHz is 2.861 Hz')
+         
+        if frequency > 732.42:
+            timer_mode = 1 #8-bit = mode 1
+            div = 2**8
+        else:
+            timer_mode = 0 #16-bit = mode 0
+            div = 2**16
+
+        # make sure digital value is 0
+        self.digitalWrite(pwm_channel,0)
+        self.digitalWrite(gating_channel,0)
+        # why is this necessary? make sure that the channel isn't already sending a signal?
+        # it's to turn off the PWM pulse, since pwm() is called twice, once at the start at the pulse, then at the end
+
+        if duty_cycle == 0:
+            # PWM can't fully turn off. Use digital write instead
+            # and return
+            return
+        
+        # divisor should be in the range 0-255, 0 corresponds to a divisor of 256  
+        timer_clock_divisor = int( (self.clock_freq * 1e6)/(frequency * div) ) #48 MHz / (frequency * divisor)
+        
+        if timer_clock_divisor == 256: 
+            timer_clock_divisor = 0 
+        
+        # enable Timer0, set pin offset
+        # self.device.configIO(NumberOfTimersEnabled=1, TimerCounterPinOffset=pwm_channel)
+        self.device.configIO(NumberOfTimersEnabled=2, TimerCounterPinOffset=pwm_channel)
+
+        # set the timer clock to 48 MHz with divisor (correspond to value of 6 with reference to section 2.9)
+        self.device.configTimerClock(TimerClockBase=6, TimerClockDivisor=timer_clock_divisor)
+
+        # 16-bit value for pwm duty cycle
+        pwm_value = int(65535*(1-duty_cycle))
+        
+        #16-bit value for gating duty cycle
+        if frequency < 100: 
+            perc_on = 0.01 / (1/frequency) #10ms max gating duration 
+            gating_value = int(65535*(1-perc_on))
+        else:
+            gating_value = 1 #lowest possible 
+
+        # Configure the timer for 16-bit PWM
+        time_start_pwm = time.monotonic_ns()
+        self.device.getFeedback(u3.TimerConfig(timer=0, TimerMode=timer_mode, Value=pwm_value))
+        self.device.getFeedback(u3.TimerConfig(timer=1, TimerMode=timer_mode, Value=gating_value))
+        print('start_pwm: ', time_start_pwm)
+        print(gating_channel)
 
     def close(self) -> None:
         self.device.close()
