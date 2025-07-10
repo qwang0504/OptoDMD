@@ -349,9 +349,9 @@ class StartStim(QRunnable):
                 time.sleep(1) #give time for CameraWidget to receive trial index
 
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
-                print('trial start signal emitted: ', time.perf_counter_ns())
+                print('trial start signal emitted: ', time.monotonic_ns())
                 print('trial index: ', i+1)
-                time.sleep(2) #start recording first before exposing mask 
+                time.sleep(15) #start recording baseline first before exposing mask 
                 
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
@@ -360,7 +360,8 @@ class StartStim(QRunnable):
                 self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
                 time.sleep(self.stim_manager.recording_duration_input.value())
                 self.trial_signal.trial_end.emit()
-                interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
+                # interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
+                interval = self.stim_manager.interval
                 time.sleep(interval)
 
                 self.pulse_start[i] = self.led_driver.pulse_sender.time_start
