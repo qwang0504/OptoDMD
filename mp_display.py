@@ -394,7 +394,8 @@ class CameraWidget(QWidget):
             print('Acquisition not started')
 
     def start_recording(self):
-        self.video_start_time = time.perf_counter_ns()
+        # self.video_start_time = time.perf_counter_ns()
+        self.video_start_time = time.monotonic_ns()
         self.params['video_start_time'] = {'value': self.video_start_time}
         self.front_pipe_gui.send('start_recording')
         self.front_pipe_gui.send(self.params)

@@ -26,17 +26,21 @@ from PyQt5.QtCore import QThreadPool
 # TODO: PWM duty cycle not precise
 # TODO: termination methods
 # TODO: close sockets cleanly
-# TODO: implement "reverse" PWM for PMT gating
+# TODO: include method for choosing calibration with / without negative lens
+# TODO: include abort / stop for stimulation! 
+# TODO: fix issue where first frame of video is last frame of previous video 
 
 if __name__ == "__main__":
 
     height = 488
     width = 648
 
+    NEGATIVE_LENS = True
+
     PROTOCOL = "tcp://"
     HOST = "localhost"
-    SI_FRAMES_PORT = 5002
-    SI_TRIGGER_PORT = 6002
+    SI_FRAMES_PORT = 5001
+    SI_TRIGGER_PORT = 6001
 
     # dmd settings
     SCREEN_DMD = 2
@@ -45,13 +49,13 @@ if __name__ == "__main__":
     DMD_WIDTH = 912
 
     # labjack settingss
-    PWM_CHANNEL = 6
-    PMT_GATING_CHANNEL = 2
+    PWM_CHANNEL = 4
+    GATING_CHANNEL = 5 #has to be +1 from PWM_CHANNEL
     
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
     try:
-        with open('calibration_3x/calibration.json', 'r') as f:
+        with open('calibration.json', 'r') as f: #current: calibration_2x_webcam_neg150_v2
             calibration = json.load(f)
 
         # 0: cam, 1: dmd, 2: twop
@@ -117,7 +121,7 @@ if __name__ == "__main__":
 
     # Control LEDs
     daio = LabJackU3LV_hl()
-    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "475 nm") 
+    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, gating_channel=GATING_CHANNEL, name = "470 nm") 
     led_widget = LEDWidget(led_drivers=[led])
     led_widget.show()
 

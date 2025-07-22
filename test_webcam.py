@@ -5,7 +5,7 @@ from DMD import DMD
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 from stimulation import StimManager
-from camera_tools import XimeaCamera
+from camera_tools import OpenCV_Webcam, OpenCV_Webcam_Gray
 from old_code.camera_widgets import CameraControl
 from numpy.typing import NDArray
 import cv2
@@ -15,6 +15,7 @@ import numpy as np
 from image_tools import DrawPolyMask
 import json
 from Microscope import ImageSender, ScanImage
+import matplotlib.pyplot as plt
 
 def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
     
@@ -41,8 +42,8 @@ def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
 
 PROTOCOL = "tcp://"
 HOST = "localhost"
-SI_FRAMES_PORT = 5000
-SI_TRIGGER_PORT = 6000
+SI_FRAMES_PORT = 5022
+SI_TRIGGER_PORT = 6022
 
 # dmd settings
 SCREEN_DMD = 2
@@ -93,13 +94,11 @@ thread_pool.start(twop_sender)
 # Control DMD
 dmd_widget = DMD(screen_num=SCREEN_DMD)
 
-pattern = create_calibration_pattern(2, DMD_HEIGHT, DMD_WIDTH)
+pattern = create_calibration_pattern(5, DMD_HEIGHT, DMD_WIDTH)
 dmd_widget.update_image(pattern)
 
 # Masks
-# cam_drawer = DrawPolyMask(np.zeros((512,512)))
-cam_drawer = DrawPolyMask(np.zeros((480,640)))
-
+cam_drawer = DrawPolyMask(np.zeros((512,512)))
 dmd_drawer = DrawPolyMask(np.zeros((DMD_HEIGHT,DMD_WIDTH)))
 twop_drawer = DrawPolyMask(np.zeros((512,512)))
 

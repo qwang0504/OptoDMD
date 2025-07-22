@@ -13,6 +13,12 @@ from numpy.typing import NDArray
 import cv2
 from image_tools import regular_polygon, star
 import json
+from camera_tools import XimeaCamera, OpenCV_Webcam_Gray, OpenCV_Webcam
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2 
+from PIL import Image
+from skimage import io
 
 def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
     
@@ -38,13 +44,14 @@ def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
 
 if __name__ == "__main__":
 
-    CALIBRATE_CAMERA = True
-    CALIBRATE_TWOPHOTON = False
+    CALIBRATE_CAMERA = False
+    CALIBRATE_TWOPHOTON = True
     SCREEN_DMD = 2
     DMD_HEIGHT = 1140
     DMD_WIDTH = 912
     XIMEA_INDEX = 0
     PWM_CHANNEL = 6
+    OBJECTIVE_RESOLUTION = 80.4884
 
     I = np.eye(3)
     dmd_to_cam = I
@@ -61,20 +68,12 @@ if __name__ == "__main__":
 
         app = QApplication(sys.argv)
 
-        # # Control LEDs
-        # daio = LabJackU3LV_hl()
-        # led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "475 nm") 
-        # led_widget = LEDWidget(led_drivers=[led])
-        # led_widget.show()
-
         # projector
         dmd_widget = DMD(screen_num=SCREEN_DMD)
         dmd_widget.update_image(pattern)
 
         # get image from camera 
-        # cam = XimeaCamera(XIMEA_INDEX)
         cam = OpenCV_Webcam(0)
-        # cam.set_exposure(10000)
         cam.start_acquisition()
         input("Press Enter to grab frame...")
         frame = cam.get_frame()
@@ -89,11 +88,11 @@ if __name__ == "__main__":
         dmd_to_cam = np.linalg.inv(cam_to_dmd)
 
         calibration_cam_dmd = {
-            'dmd_to_cam': dmd_to_cam.tolist(),
-            'cam_to_dmd': cam_to_dmd.tolist()
+            'dmd_to_webcam': dmd_to_cam.tolist(),
+            'webcam_to_dmd': cam_to_dmd.tolist()
         }
     
-        with open('calibration_cam_dmd.json', 'w') as f:
+        with open('calibration_webcam_dmd.json', 'w') as f:
             json.dump(calibration_cam_dmd, f)
 
     if CALIBRATE_TWOPHOTON:
@@ -103,7 +102,7 @@ if __name__ == "__main__":
         # communicate with scanimage
         PROTOCOL = "tcp://"
         HOST = "localhost"
-        SI_FRAMES_PORT = 5022
+        SI_FRAMES_PORT = 5000
 
         print("""
         Put a slide with some structure under the microscope
@@ -117,21 +116,24 @@ if __name__ == "__main__":
         dmd_widget.update_image(255*np.ones((DMD_HEIGHT,DMD_WIDTH,3), np.uint8))
         
         # get image from camera
-        # cam = XimeaCamera(XIMEA_INDEX)
         cam = OpenCV_Webcam(0)
-        # cam.set_exposure(10_000)
+
         cam.start_acquisition()
-        input("Press Enter to grab frame...")
-        # frames = []
-        # for i in range(16):
-        #     input("Press Enter to grab frame...")
-        #     frame = cam.get_frame()
-        #     frames.append(frame)
-        # points = np.zeros(tuple((len(frames), *frames[0]['image'].shape)), dtype=np.uint8)
-        # for i, frame in enumerate(frames):
-        #     points[i] = frame['image']
         frame = cam.get_frame()
-        print("...image captured")
+        frames = []
+        for i in range(17):
+            input("Press Enter to grab frame...")
+            frame = cam.get_frame()
+            frames.append(frame)
+            print("...image captured")
+        points_img = np.zeros(tuple((len(frames), *frames[0]['image'].shape)), dtype=np.uint8)
+        for i, frame in enumerate(frames):
+            points_img[i] = frame['image']
+
+        np.save('points_img.npy', points_img)
+
+        mip = np.max(points_img, axis=0)
+
         cam.stop_acquisition()
 
         # stop light
@@ -144,7 +146,9 @@ if __name__ == "__main__":
         print("...image captured")
 
         # do the registration
-        register = AlignAffine2D(twop_image, frame['image']) #fixed, moving
+        register = AlignAffine2D(twop_image, mip) #fixed, moving
+        # register = AlignAffine2D(twop_image, frame['image']) #fixed, moving
+
         register.show()
         app.exec()
         
@@ -152,34 +156,64 @@ if __name__ == "__main__":
         twop_to_cam = np.linalg.inv(cam_to_twop)
 
         calibration_cam_twop = {
-            'cam_to_twop': cam_to_twop.tolist(),
-            'twop_to_cam': twop_to_cam.tolist()
+            'webcam_to_twop': cam_to_twop.tolist(),
+            'twop_to_webcam': twop_to_cam.tolist()
         }
 
-        with open('calibration_cam_twop.json', 'w') as f:
+        with open('calibration_webcam_twop.json', 'w') as f:
             json.dump(calibration_cam_twop, f)
 
     # DMD to 2P ----------------------------------------------------------------
 
-    with open('calibration_cam_dmd.json', 'r') as f1:
-        cal_cam_dmd = json.load(f1)
+    with open('calibration_webcam_dmd.json', 'r') as f1:
+        cal_webcam_dmd = json.load(f1)
 
-    with open('calibration_cam_twop.json', 'r') as f2:
-        cal_cam_twop = json.load(f2)
+    with open('calibration_webcam_twop.json', 'r') as f2:
+        cal_webcam_twop = json.load(f2)
         
-    dmd_to_twop = np.asarray(cal_cam_twop['cam_to_twop']) @ np.asarray(cal_cam_dmd['dmd_to_cam']) 
-    twop_to_dmd = np.asarray(cal_cam_dmd['cam_to_dmd']) @ np.asarray(cal_cam_twop['twop_to_cam']) 
+    dmd_to_twop = np.asarray(cal_webcam_twop['webcam_to_twop']) @ np.asarray(cal_webcam_dmd['dmd_to_webcam']) 
+    twop_to_dmd = np.asarray(cal_webcam_dmd['webcam_to_dmd']) @ np.asarray(cal_webcam_twop['twop_to_webcam']) 
+    
 
     # Save results to file -----------------------------------------------------
 
     calibration = {
-        'dmd_to_cam': cal_cam_dmd['dmd_to_cam'],
-        'cam_to_dmd': cal_cam_dmd['cam_to_dmd'],
-        'cam_to_twop': cal_cam_twop['cam_to_twop'],
-        'twop_to_cam': cal_cam_twop['twop_to_cam'],
+        'dmd_to_cam': cal_webcam_dmd['dmd_to_webcam'],
+        'cam_to_dmd': cal_webcam_dmd['webcam_to_dmd'],
+        'cam_to_twop': cal_webcam_twop['webcam_to_twop'],
+        'twop_to_cam': cal_webcam_twop['twop_to_webcam'],
         'dmd_to_twop': dmd_to_twop.tolist(),
         'twop_to_dmd': twop_to_dmd.tolist()
     }
 
     with open('calibration.json', 'w') as f:
         json.dump(calibration, f)
+
+
+
+
+# for i in range(17):
+#     im = Image.fromarray(points[i])
+#     im.save(str(i)+'.jpg')
+
+# np.save('points.npy', points)
+
+# mip = np.max(points, axis=0)
+
+# plt.imshow(points[0])
+# plt.show()
+
+# #390, 311
+# gray = cv2.cvtColor(points[1],cv2.COLOR_BGR2GRAY)
+# median = cv2.medianBlur(gray, 3)
+# canny = cv2.Canny(median, 100, 200)
+# outline = np.argwhere(canny>0)
+# center, radius = cv2.minEnclosingCircle(outline)
+# print('center:', center, 'radius:', radius)
+
+# result = points[0].copy()
+# x = int(center[1])
+# y = int(center[0])
+# rad = int(radius)
+# cv2.circle(result, (x,y), rad, (255,255,255), 1)
+# cv2.imshow("result", result)

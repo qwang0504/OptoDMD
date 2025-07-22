@@ -53,8 +53,8 @@ class CameraProcess(Process):
     def init_cam(self):
         self.camera = self.camera_constructor()
         
-        self.camera.set_framerate(200)
-        self.camera.set_exposure(2000)
+        # self.camera.set_framerate(200)
+        # self.camera.set_exposure(2000)
 
         init_params = {}
     
@@ -97,7 +97,7 @@ class CameraProcess(Process):
             for attr, param in msg.items():
                 value = param['value']
                 setattr(self, attr, value)
-                print(f'cam {attr}, {value}')
+                # print(f'cam {attr}, {value}')
                 self.frame_interval = np.round(msg['framerate']['value'] / 60) #display at ~60 fps
 
         elif isinstance(msg, str):
@@ -146,7 +146,7 @@ class CameraProcess(Process):
             
             self.current_qsize = self.save_buffer.qsize()
             if self.current_qsize != self.previous_qsize:
-                print(f'save buffer queue size: {self.current_qsize}')
+                # print(f'save buffer queue size: {self.current_qsize}')
                 self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()

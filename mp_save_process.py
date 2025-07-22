@@ -41,6 +41,7 @@ class SaveProcess(Process):
         self.active = True
 
         self.metadata = 0
+        self.trial_index = None
 
     def get_params(self):
         msg = self.back_pipe_save.recv()
@@ -101,6 +102,7 @@ class SaveProcess(Process):
                 'trial_index': self.trial_index,
                 'stim_number': self.stim_number,
                 'video_start': self.video_start_time,
+                'video_start_save': self.video_start_time_save, 
                 'fps': self.framerate,
                 'exposure': self.exposure,
                 'gain': self.gain,
@@ -123,22 +125,25 @@ class SaveProcess(Process):
             if self.terminate_event.is_set():
                 break 
             self.init_videowriter()
-            frame_count_filename = 'save_frames' + str(self.trial_index) + '.txt'
-            frame_count_path = Path(self.output_dir) / self.fish_id / self.stim_folder
-            frame_count_filepath = frame_count_path / frame_count_filename
-            fd = open(str(frame_count_filepath), 'w')
-            
+            if self.trial_index is not None:
+                frame_count_filename = 'save_frames' + str(self.trial_index) + '.txt'
+                frame_count_path = Path(self.output_dir) / self.fish_id / self.stim_folder
+                frame_count_filepath = frame_count_path / frame_count_filename
+                fd = open(str(frame_count_filepath), 'w')
             frame_count = 0
             while self.active:
                 frame = self.save_buffer.get()
                 if frame_count == 0:
-                    print(f'video_start_time_SAVE = {time.perf_counter_ns()}')
+                    self.video_start_time_save = time.monotonic_ns()
+                    # print(f'video_start_time_SAVE = {time.monotonic_ns()}')
                 if frame['image'].sum() > 0:
                     self.video_writer.write_frame(frame['image'])
-                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                    if self.trial_index is not None:
+                        fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                     frame_count += 1
                 else: 
-                    fd.close()
+                    if self.trial_index is not None:
+                        fd.close()
                     self.release_file()
                     self.generate_trial_metadata()
                     break
