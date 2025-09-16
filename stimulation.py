@@ -345,12 +345,12 @@ class StartStim(QRunnable):
         # if self.active:
         if self.stim_manager.shuffled_mask_keys:
             for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
-                self.trial_signal.trial_index.emit(i+1) #1-based trial indexing
+                self.trial_signal.trial_index.emit(i) #0-based trial indexing
                 time.sleep(1) #give time for CameraWidget to receive trial index
 
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
                 print('trial start signal emitted: ', time.monotonic_ns())
-                print('trial index: ', i+1)
+                print('trial index: ', i)
                 time.sleep(15) #start recording baseline first before exposing mask 
                 
                 self.stim_manager.mask_expose.emit(key)
