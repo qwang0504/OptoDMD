@@ -23,14 +23,14 @@ class SaveProcess(Process):
     def __init__(self, 
                  back_pipe_save: connection.Connection,
                  save_buffer: ArrayQueue,
-                 start_event, 
+                #  start_event, 
                  terminate_event,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         self.back_pipe_save = back_pipe_save
         self.save_buffer = save_buffer
-        self.start_event = start_event
+        # self.start_event = start_event
         self.terminate_event = terminate_event
 
         self.codec = 'h264'
@@ -54,10 +54,10 @@ class SaveProcess(Process):
                 # print(f'save: {attr}, {value}')
 
         elif msg == 'terminate':
-            self.terminate()
+            print('SaveProcess terminated')
 
-    def terminate(self):
-        self.active = False
+    # def terminate(self):
+    #     self.active = False
 
     def init_videowriter(self):
         if self.fish_id:
@@ -91,6 +91,7 @@ class SaveProcess(Process):
         print('VideoWriter initialised')
 
     def release_file(self):
+        self.save_buffer.clear()
         self.video_writer.close()
         self.video_writer = None
         # self.termination_event.set()
@@ -131,7 +132,7 @@ class SaveProcess(Process):
                 frame_count_filepath = frame_count_path / frame_count_filename
                 fd = open(str(frame_count_filepath), 'w')
             frame_count = 0
-            while self.active:
+            while True:
                 frame = self.save_buffer.get()
                 if frame_count == 0:
                     self.video_start_time_save = time.monotonic_ns()
@@ -141,7 +142,8 @@ class SaveProcess(Process):
                     if self.trial_index is not None:
                         fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                     frame_count += 1
-                else: 
+                else:
+                    self.save_buffer.clear()
                     if self.trial_index is not None:
                         fd.close()
                     self.release_file()

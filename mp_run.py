@@ -25,7 +25,6 @@ from PyQt5.QtCore import QThreadPool
 # TODO: close sockets cleanly
 # TODO: include abort / stop for stimulation! 
 # TODO: fix issue where first frame of video is last frame of previous video 
-# TODO: implement LED control for galvo-flyback stimulation 
 # TODO: calibration method for Basler Dart camera 
 
 if __name__ == "__main__":

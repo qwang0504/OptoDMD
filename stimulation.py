@@ -143,6 +143,12 @@ class StimManager(QWidget):
         self.recording_duration_input.setSingleStep(1)
         self.recording_duration_input.setValue(10)
 
+        self.baseline_duration_input = LabeledSpinBox(self)
+        self.baseline_duration_input.setText('Duration of baseline recording (s)')
+        self.baseline_duration_input.setRange(0, 9999)
+        self.baseline_duration_input.setSingleStep(1)
+        self.baseline_duration_input.setValue(15)
+
     def layout_components(self):
         
         layout_overall = QHBoxLayout()
@@ -168,6 +174,7 @@ class StimManager(QWidget):
         layout_controls.addWidget(self.freq_spinbox)
         layout_controls.addWidget(self.duration_spinbox)
         layout_controls.addWidget(self.recording_duration_input)
+        layout_controls.addWidget(self.baseline_duration_input)
 
         layout_trial_controls = QHBoxLayout()
         layout_trial_controls.addWidget(self.rep_spinbox)
@@ -351,7 +358,7 @@ class StartStim(QRunnable):
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
                 print('trial start signal emitted: ', time.monotonic_ns())
                 print('trial index: ', i)
-                time.sleep(15) #start recording baseline first before exposing mask 
+                time.sleep(self.stim_manager.baseline_duration_input.value()) #start recording baseline first before exposing mask 
                 
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
