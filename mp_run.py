@@ -22,13 +22,11 @@ from Microscope import ImageSender, ScanImage
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 
-# TODO: check arrayqueue length
-# TODO: PWM duty cycle not precise
-# TODO: termination methods
 # TODO: close sockets cleanly
-# TODO: include method for choosing calibration with / without negative lens
 # TODO: include abort / stop for stimulation! 
 # TODO: fix issue where first frame of video is last frame of previous video 
+# TODO: implement LED control for galvo-flyback stimulation 
+# TODO: calibration method for Basler Dart camera 
 
 if __name__ == "__main__":
 
@@ -39,8 +37,8 @@ if __name__ == "__main__":
 
     PROTOCOL = "tcp://"
     HOST = "localhost"
-    SI_FRAMES_PORT = 5001
-    SI_TRIGGER_PORT = 6001
+    SI_FRAMES_PORT = 5002
+    SI_TRIGGER_PORT = 6002
 
     # dmd settings
     SCREEN_DMD = 2
@@ -50,23 +48,41 @@ if __name__ == "__main__":
 
     # labjack settingss
     PWM_CHANNEL = 4
-    GATING_CHANNEL = 5 #has to be +1 from PWM_CHANNEL
+    # GATING_CHANNEL = 5 #has to be +1 from PWM_CHANNEL
     
     # calibration file
     transformations = np.tile(np.eye(3), (3,3,1,1))
-    try:
-        with open('calibration.json', 'r') as f: #current: calibration_2x_webcam_neg150_v2
-            calibration = json.load(f)
 
-        # 0: cam, 1: dmd, 2: twop
-        transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
-        transformations[0,2] = np.asarray(calibration["cam_to_twop"])
-        transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
-        transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
-        transformations[2,0] = np.asarray(calibration["twop_to_cam"])
-        transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
-    except:
-        print("calibration couldn't be loaded, defaulting to identity")
+    if NEGATIVE_LENS:
+        try:
+            with open(r'current_calibration_neg/calibration.json', 'r') as f: 
+                calibration = json.load(f)
+
+            # 0: cam, 1: dmd, 2: twop
+            transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
+            transformations[0,2] = np.asarray(calibration["cam_to_twop"])
+            transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
+            transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
+            transformations[2,0] = np.asarray(calibration["twop_to_cam"])
+            transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
+        except:
+            print("calibration couldn't be loaded, defaulting to identity")
+
+    else: 
+        try:
+            with open(r'current_calibration/calibration.json', 'r') as f: 
+                calibration = json.load(f)
+
+            # 0: cam, 1: dmd, 2: twop
+            transformations[0,1] = np.asarray(calibration["cam_to_dmd"])
+            transformations[0,2] = np.asarray(calibration["cam_to_twop"])
+            transformations[1,0] = np.asarray(calibration["dmd_to_cam"])
+            transformations[1,2] = np.asarray(calibration["dmd_to_twop"])
+            transformations[2,0] = np.asarray(calibration["twop_to_cam"])
+            transformations[2,1] = np.asarray(calibration["twop_to_dmd"])
+        except:
+            print("calibration couldn't be loaded, defaulting to identity")
+
 
     front_pipe_cam, back_pipe_cam = Pipe()
     front_pipe_save, back_pipe_save = Pipe()
@@ -104,7 +120,7 @@ if __name__ == "__main__":
     
     save_process = SaveProcess(back_pipe_save=back_pipe_save,
                                save_buffer=save_buffer,
-                               start_event=start_event,
+                            #    start_event=start_event,
                                terminate_event=terminate_event)
 
     camera_process.start()
@@ -121,7 +137,7 @@ if __name__ == "__main__":
 
     # Control LEDs
     daio = LabJackU3LV_hl()
-    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, gating_channel=GATING_CHANNEL, name = "470 nm") 
+    led = LEDD1B(daio, pwm_channel=PWM_CHANNEL, name = "470 nm") 
     led_widget = LEDWidget(led_drivers=[led])
     led_widget.show()
 
