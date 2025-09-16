@@ -41,8 +41,8 @@ def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
 
 PROTOCOL = "tcp://"
 HOST = "localhost"
-SI_FRAMES_PORT = 5000
-SI_TRIGGER_PORT = 6000
+SI_FRAMES_PORT = 5001
+SI_TRIGGER_PORT = 6001
 
 # dmd settings
 SCREEN_DMD = 2

@@ -102,7 +102,7 @@ if __name__ == "__main__":
         # communicate with scanimage
         PROTOCOL = "tcp://"
         HOST = "localhost"
-        SI_FRAMES_PORT = 5000
+        SI_FRAMES_PORT = 5002
 
         print("""
         Put a slide with some structure under the microscope
@@ -124,11 +124,13 @@ if __name__ == "__main__":
         for i in range(17):
             input("Press Enter to grab frame...")
             frame = cam.get_frame()
-            frames.append(frame)
+            frames.append(frame['image'])
             print("...image captured")
-        points_img = np.zeros(tuple((len(frames), *frames[0]['image'].shape)), dtype=np.uint8)
-        for i, frame in enumerate(frames):
-            points_img[i] = frame['image']
+
+        points_img = np.stack(frames)
+        # points_img = np.zeros(tuple((len(frames), *frames[0].shape)), dtype=np.uint8)
+        # for i, frame in enumerate(frames):
+        #     points_img[i] = frame['image']
 
         np.save('points_img.npy', points_img)
 
@@ -192,28 +194,3 @@ if __name__ == "__main__":
 
 
 
-# for i in range(17):
-#     im = Image.fromarray(points[i])
-#     im.save(str(i)+'.jpg')
-
-# np.save('points.npy', points)
-
-# mip = np.max(points, axis=0)
-
-# plt.imshow(points[0])
-# plt.show()
-
-# #390, 311
-# gray = cv2.cvtColor(points[1],cv2.COLOR_BGR2GRAY)
-# median = cv2.medianBlur(gray, 3)
-# canny = cv2.Canny(median, 100, 200)
-# outline = np.argwhere(canny>0)
-# center, radius = cv2.minEnclosingCircle(outline)
-# print('center:', center, 'radius:', radius)
-
-# result = points[0].copy()
-# x = int(center[1])
-# y = int(center[0])
-# rad = int(radius)
-# cv2.circle(result, (x,y), rad, (255,255,255), 1)
-# cv2.imshow("result", result)
