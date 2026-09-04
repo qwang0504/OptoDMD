@@ -295,6 +295,7 @@ class StimManager(QWidget):
             'fish_id': str(self.fish_id), 
             'stim_number': self.stim_number,
             'interval': self.interval_spinbox.value(), 
+            'baseline_interval': self.baseline_duration_input.value(),
             'mask_order': self.shuffled_mask_names, 
             'led_power': self.start_stim.led_dial,
             'pwm_frequency': self.freq_spinbox.value(), 

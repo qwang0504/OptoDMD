@@ -26,6 +26,7 @@ from PyQt5.QtCore import QThreadPool
 # TODO: include abort / stop for stimulation! 
 # TODO: fix issue where first frame of video is last frame of previous video 
 # TODO: calibration method for Basler Dart camera 
+# TODO: fix metadata issue with default values 
 
 if __name__ == "__main__":
 
@@ -36,8 +37,8 @@ if __name__ == "__main__":
 
     PROTOCOL = "tcp://"
     HOST = "localhost"
-    SI_FRAMES_PORT = 5002
-    SI_TRIGGER_PORT = 6002
+    SI_FRAMES_PORT = 5000
+    SI_TRIGGER_PORT = 6000
 
     # dmd settings
     SCREEN_DMD = 2
@@ -90,8 +91,8 @@ if __name__ == "__main__":
     start_event = Event()
     terminate_event = Event()
 
-    display_buffer = ArrayQueue(200)
-    save_buffer = ArrayQueue(200)
+    display_buffer = ArrayQueue(500)
+    save_buffer = ArrayQueue(500)
 
     # create empty structured array as sentinel 
     empty_img = np.zeros((height, width), dtype=np.uint8)

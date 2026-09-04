@@ -38,7 +38,7 @@ class MessageRelay(Process):
             #     print('trigger received by MessageRelay')
 
             msg = self.back_pipe_gui.recv()
-            print(f"Process: {self.name} received {msg}")
+            # print(f"Process: {self.name} received {msg}")
             
             if msg == 'start_acquisition': 
                 self.front_pipe_cam.send('display')

@@ -144,10 +144,10 @@ class CameraProcess(Process):
                     # fd.write(f"{frame['index']}, {frame['timestamp']}\n")
                     frame_count = 0
             
-            self.current_qsize = self.save_buffer.qsize()
-            if self.current_qsize != self.previous_qsize:
-                # print(f'save buffer queue size: {self.current_qsize}')
-                self.previous_qsize = self.current_qsize
+            # self.current_qsize = self.save_buffer.qsize()
+            # if self.current_qsize != self.previous_qsize:
+            #     # print(f'save buffer queue size: {self.current_qsize}')
+            #     self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()
         # fs.close()

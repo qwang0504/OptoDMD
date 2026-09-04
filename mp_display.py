@@ -390,6 +390,7 @@ class CameraWidget(QWidget):
             self.close_thread()
             self.acquisition_enabled()
             self.acquisition_started = False
+            self.display_buffer.clear()
         else: 
             print('Acquisition not started')
 

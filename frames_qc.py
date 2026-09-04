@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 dtype = [('index', int), ('timestamp', np.float32)]
 
-cam = np.loadtxt(r'E:\DMD_2p_data\20250717003\stim2\save_frames7.txt', delimiter=',', dtype=dtype)
+cam = np.loadtxt(r'E:\DMD_2p_data\20251017003\stim1\save_frames3.txt', delimiter=',', dtype=dtype)
 save = np.loadtxt('save_frames_AQ_250.txt', delimiter=',', dtype=dtype)
 display = np.loadtxt(r'E:/automation_test/cam_frames_AQ_250_display_ds_pwm_25Hz_video_start_time.txt', delimiter=',', dtype=dtype)
 fps = 250
@@ -242,6 +242,7 @@ video_start = 181903106100
 video_start = 200931928500
 (((recorded_starts[5] - video_start) / 10**9)*fps).round() # = 756, observed = 747
 
+# 33 msec 
 
 ### For 20250606001 stim1 -> 62 second videos
 
@@ -395,3 +396,210 @@ video_start_save = 3124859000000
 
 (((recorded_starts[8] - video_start_time) / 10**9)*fps).round() # = 4004, observed = 3996 -> -8
 (((recorded_starts[8] - video_start_save) / 10**9)*fps).round() # = 4004, observed = 3996 -> -8
+
+
+
+# For galvo flyback test in E:\automation_test\20250917001\stim2
+
+recorded_starts = np.array([1111250000000.0, 1188281000000.0, 1265328000000.0, 1342375000000.0, 1419421000000.0, 1496453000000.0, 1573500000000.0, 1650531000000.0])
+fps = 250
+
+# trial 0
+# no drops
+video_start_time = 1095250000000
+video_start_save = 1095250000000
+
+print((((recorded_starts[0] - video_start_time) / 10**9)*fps).round()) # = 4000, observed = 3995 -> -5
+print((((recorded_starts[0] - video_start_save) / 10**9)*fps).round()) # = 4000, observed = 3995 -> -5
+
+
+# trial 1
+# no drops
+video_start_time = 1172265000000
+video_start_save = 1172281000000
+
+print((((recorded_starts[1] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3995 -> -9
+print((((recorded_starts[1] - video_start_save) / 10**9)*fps).round()) # = 4000, observed = 3995 -> -5
+
+# trial 2
+# no drops
+video_start_time = 1249312000000
+video_start_save = 1249359000000
+
+print((((recorded_starts[2] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3996 -> -8
+print((((recorded_starts[2] - video_start_save) / 10**9)*fps).round()) # = 3992, observed = 3996 -> +4
+
+
+# trial 3
+# no drops
+video_start_time = 1326359000000
+video_start_save = 1326359000000
+
+print((((recorded_starts[3] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3996 -> -8
+print((((recorded_starts[3] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3996 -> -8
+
+
+# trial 4
+# no drops
+video_start_time = 1403390000000
+video_start_save = 1403406000000
+
+print((((recorded_starts[4] - video_start_time) / 10**9)*fps).round()) # = 4008, observed = 3998 -> -10
+print((((recorded_starts[4] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3998 -> -6
+
+
+# trial 5
+# no drops
+video_start_time = 1480437000000
+video_start_save = 1480437000000
+
+print((((recorded_starts[5] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+print((((recorded_starts[5] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+
+
+# trial 6
+# no drops
+video_start_time = 1557468000000
+video_start_save = 1557484000000
+
+print((((recorded_starts[6] - video_start_time) / 10**9)*fps).round()) # = 4008, observed = 3997 -> -11
+print((((recorded_starts[6] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+
+# trial 7
+# no drops
+video_start_time = 1634515000000
+video_start_save = 1634515000000
+
+print((((recorded_starts[7] - video_start_time) / 10**9)*fps).round()) # = 4008, observed = 3998 -> -10
+print((((recorded_starts[7] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3998 -> -6
+
+
+# For galvo flyback test in E:\automation_test\20250917001\stim3
+
+recorded_starts = np.array([7025812000000.0, 7102843000000.0, 7179890000000.0, 7256921000000.0])
+
+# trial 0
+# dropped 1 frame
+video_start_time = 7009796000000
+video_start_save = 7009796000000
+
+print((((recorded_starts[0] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3994 -> -10
+print((((recorded_starts[0] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3994 -> -10
+
+# trial 1
+# no drops
+video_start_time = 7086828000000
+video_start_save = 7086828000000
+
+print((((recorded_starts[1] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+print((((recorded_starts[1] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+
+# trial 2
+# no drops
+video_start_time = 7163875000000
+video_start_save = 7163921000000
+
+print((((recorded_starts[2] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3995 -> -9
+print((((recorded_starts[2] - video_start_save) / 10**9)*fps).round()) # = 3992, observed = 3995 -> +3
+
+# trial 3
+# no drops
+video_start_time = 7240921000000
+video_start_save = 7240921000000
+
+print((((recorded_starts[3] - video_start_time) / 10**9)*fps).round()) # = 4000, observed = 3996 -> -4
+print((((recorded_starts[3] - video_start_save) / 10**9)*fps).round()) # = 4000, observed = 3996 -> -4
+
+
+# For galvo flyback test in E:\automation_test\20250918001\stim1
+
+recorded_starts = np.array([80756640000000.0, 80833687000000.0, 80910718000000.0, 80987765000000.0, 81064796000000.0, 81141843000000.0])
+fps = 250
+
+# trial 0
+# no drops
+video_start_time = 80740625000000
+video_start_save = 80740656000000
+
+print((((recorded_starts[0] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3996 -> -8
+print((((recorded_starts[0] - video_start_save) / 10**9)*fps).round()) # = 3996, observed = 3996 -> 0
+
+# trial 1
+# no drops
+video_start_time = 80817656000000
+video_start_save = 80817671000000
+
+print((((recorded_starts[1] - video_start_time) / 10**9)*fps).round()) # = 4008, observed = 4001 -> -7
+print((((recorded_starts[1] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4001 -> -3
+
+# trial 2
+# no drops
+video_start_time = 80894703000000
+video_start_save = 80894718000000
+
+print((((recorded_starts[2] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3997 -> -7
+print((((recorded_starts[2] - video_start_save) / 10**9)*fps).round()) # = 4000, observed = 3997 -> -3
+
+# trial 3
+# no drops
+video_start_time = 80971734000000
+video_start_save = 80971750000000
+
+print((((recorded_starts[3] - video_start_time) / 10**9)*fps).round()) # = 4008, observed = 4000 -> -8
+print((((recorded_starts[3] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -4
+
+# trial 4
+# no drops
+video_start_time = 81048781000000
+video_start_save = 81048796000000
+
+print((((recorded_starts[4] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 3999 -> -5
+print((((recorded_starts[4] - video_start_save) / 10**9)*fps).round()) # = 4000, observed = 3999 -> -1
+
+# trial 5
+# no drops
+video_start_time = 81125828000000
+video_start_save = 81125828000000
+
+print((((recorded_starts[5] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -4
+print((((recorded_starts[5] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -4
+
+#For E:\automation_test\20250925001\stim3
+
+recorded_starts = np.array([2185140000000.0, 2222187000000.0, 2259218000000.0, 2296250000000.0])
+fps = 250
+
+# trial 0
+# no drops
+video_start_time = 2169125000000
+video_start_save = 2169171000000
+
+print((((recorded_starts[0] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -4
+print((((recorded_starts[0] - video_start_save) / 10**9)*fps).round()) # = 3992, observed = 4000 -> -8
+
+# trial 1
+# no drops
+video_start_time = 2206171000000
+video_start_save = 2206171000000
+
+print((((recorded_starts[1] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 4001 -> -3
+print((((recorded_starts[1] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4001 -> -3
+
+# trial 2
+# no drops
+video_start_time = 2243203000000
+video_start_save = 2243203000000
+
+print((((recorded_starts[2] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 4007 -> +3
+print((((recorded_starts[2] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4007 -> +3
+
+
+# trial 2
+# no drops
+video_start_time = 2280234000000
+video_start_save = 2280234000000
+
+print((((recorded_starts[3] - video_start_time) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -5
+print((((recorded_starts[3] - video_start_save) / 10**9)*fps).round()) # = 4004, observed = 4000 -> -5
+
+
