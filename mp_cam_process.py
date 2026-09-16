@@ -110,6 +110,8 @@ class CameraProcess(Process):
         while self.start_event.is_set():
             if self.back_pipe_cam.poll():
                 self.update()
+                if self.mode != 'display':
+                    break 
             else: 
                 frame = self.camera.get_frame()
                 if frame is not None:
@@ -150,6 +152,8 @@ class CameraProcess(Process):
             #     self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()
+        self.save_buffer.put(self.sentinel)
+        self.display_buffer.put(self.sentinel)
         # fs.close()
         # fd.close()
         self.mode = None

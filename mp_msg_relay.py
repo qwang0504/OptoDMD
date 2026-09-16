@@ -41,8 +41,9 @@ class MessageRelay(Process):
             # print(f"Process: {self.name} received {msg}")
             
             if msg == 'start_acquisition': 
-                self.front_pipe_cam.send('display')
                 self.start_event.set()
+                self.front_pipe_cam.send('display')
+
 
             elif msg == 'stop_acquisition':
                 self.start_event.clear()
@@ -52,8 +53,8 @@ class MessageRelay(Process):
                 # print(f'save params from MessageRelay: {save_params}')
                 self.front_pipe_save.send(save_params)
                 self.front_pipe_cam.send(save_params)
-                self.front_pipe_cam.send('save')
                 self.start_event.set()
+                self.front_pipe_cam.send('save')
 
             elif msg == 'stop_recording':
                 self.start_event.clear()                

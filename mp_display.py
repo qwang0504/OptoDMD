@@ -44,14 +44,19 @@ class DisplayWorker(QObject):
         previous_qsize = -1
         while self.active:
             # current_qsize = self.display_buffer.qsize()
+            try:
+                self.frame = self.display_buffer.get(timeout=0.1) #non-blocking
 
-            self.frame = self.display_buffer.get() #blocking
-            if self.frame['image'].sum() > 0:
-                self.frame_ready.emit()
-            else: 
+            except Empty:
+                continue
+
+            if self.frame['index'] < 0:
                 print('DisplayWorker received sentinel')
                 self.terminate()
-            
+                break
+
+            self.frame_ready.emit()
+
             # if current_qsize != previous_qsize:
             #     print(f'Display buffer queue size: {current_qsize}')
             #     previous_qsize = current_qsize
@@ -66,7 +71,7 @@ class ZMQ_worker(QObject):
     def __init__(self, 
                  *args,
                  address: str,
-                 timeout = None,
+                 timeout = 100,
                  **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -81,10 +86,9 @@ class ZMQ_worker(QObject):
         self.socket.connect(self.address)
         print(f'Socket connected to {self.address}')
 
-    def terminate(self):
+    def shutdown(self):
         self.active = False
-        self.socket.close() 
-        self.context.term()
+
 
     def check(self):
         try:
@@ -100,25 +104,38 @@ class ZMQ_worker(QObject):
         except zmq.error.ZMQError:
             pass
 
-    def check_blocking(self):
-        try:
-            if self.socket.poll(-1):
-                ret = self.socket.recv()
-                if ret:
-                    print("trigger received")
-                    self.triggered.emit()
-        except zmq.error.ZMQError:
-            pass
-
     def run(self):
         self.setup()
-        while self.active: 
-            if self.timeout:
-                self.check()
-            else: 
-                self.check_blocking()
-        self.terminate()
-        print('ZMQ_worker finished, exiting')
+        while self.active:
+            try:
+                if self.socket.poll(self.timeout):
+                    ret = self.socket.recv()
+                    if ret == b'start':
+                        print("start trigger received")
+                        self.triggered.emit()
+                    elif ret == b'stop':
+                        print("stop trigger received")
+                        self.aborted.emit()
+
+            except zmq.error.ZMQError:
+                pass
+
+        self.socket.close()
+        self.context.term()
+    
+
+
+    # def run(self):
+    #     self.setup()
+    #     while self.active: 
+    #         if self.timeout:
+    #             self.check()
+    #         else: 
+    #             self.check_blocking()
+    #     self.shutdown()
+    #     print('ZMQ_worker finished, exiting')
+
+
 
 
 class CameraWidget(QWidget):
@@ -161,9 +178,10 @@ class CameraWidget(QWidget):
         self.zmq_worker.moveToThread(self.qthread_trigger)
         self.qthread_trigger.started.connect(self.zmq_worker.run)
         self.qthread_trigger.start()
-        self.terminate_all.connect(self.zmq_worker.terminate)
+        # self.terminate_all.connect(self.zmq_worker.shutdown)
 
         self.acquisition_started = False
+        self.recording_started = False
 
         self.params = {}
 
@@ -370,6 +388,8 @@ class CameraWidget(QWidget):
     ### Callbacks
 
     def setup_worker(self):
+        if self.worker is not None:
+            return 
         self.worker = DisplayWorker(display_buffer=self.display_buffer)
         self.worker.frame_ready.connect(self.update_display)
         self.qthread = QThread()
@@ -385,12 +405,12 @@ class CameraWidget(QWidget):
 
     def stop_acquisition(self):
         if self.acquisition_started:
-            self.display_buffer.put(self.sentinel_array)
+            # self.display_buffer.put(self.sentinel_array)
             self.front_pipe_gui.send('stop_acquisition')
             self.close_thread()
             self.acquisition_enabled()
             self.acquisition_started = False
-            self.display_buffer.clear()
+            # self.display_buffer.clear()
         else: 
             print('Acquisition not started')
 
@@ -402,26 +422,34 @@ class CameraWidget(QWidget):
         self.front_pipe_gui.send(self.params)
         self.setup_worker()
         self.record_disabled()
+        self.recording_started = True
 
     def stop_recording(self):
+        if not self.recording_started:
+            return
+        self.recording_started = False
         self.front_pipe_gui.send('stop_recording')
-        self.display_buffer.put(self.sentinel_array)
-        self.save_buffer.put(self.sentinel_array)
+        # self.display_buffer.put(self.sentinel_array)
+        # self.save_buffer.put(self.sentinel_array)
         self.close_thread()
         self.record_enabled()
 
-    def terminate(self):
+    def shutdown(self):
         if self.worker:
             self.stop_acquisition()
             self.display_buffer.put(self.sentinel_array)
             self.save_buffer.put(self.sentinel_array)
             self.close_thread()
             self.front_pipe_gui.send('terminate')
-            self.terminate_all.emit()
+            # self.terminate_all.emit()
+            self.zmq_worker.shutdown()
+            self.qthread_trigger.quit()
+            self.qthread_trigger.wait(2000)
+            self.close_thread()
         else:
             print('DisplayWorker / QThread undefined, nothing to terminate')
             self.front_pipe_gui.send('terminate')
-            self.terminate_all.emit()
+            # self.terminate_all.emit()
 
     def update_display(self):
         try:
@@ -568,12 +596,16 @@ class CameraWidget(QWidget):
             print('Fish folder not found!')
 
     def close_thread(self):
-        self.qthread.quit()
-        self.qthread.wait() 
+        if self.qthread is None:
+            return 
+        if not self.qthread.wait(2000):
+            print('Warning: display thread did not exit cleanly!')
         self.qthread = None
         self.worker = None
+        # self.qthread.quit()
+        # self.qthread.wait() 
         print('qthread closed, defaults to None')
 
     def closeEvent(self, event):
-        self.terminate()
+        self.shutdown()
         event.accept()  # Accept the event to close the window

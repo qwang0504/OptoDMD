@@ -27,6 +27,7 @@ from PyQt5.QtCore import QThreadPool
 # TODO: fix issue where first frame of video is last frame of previous video 
 # TODO: calibration method for Basler Dart camera 
 # TODO: fix metadata issue with default values 
+# TODO: make default video name trial id / date-based 
 
 if __name__ == "__main__":
 
@@ -96,7 +97,7 @@ if __name__ == "__main__":
 
     # create empty structured array as sentinel 
     empty_img = np.zeros((height, width), dtype=np.uint8)
-    sentinel = np.array((0, 0, empty_img),
+    sentinel = np.array((-1, 0, empty_img),
                         dtype = np.dtype([
                             ('index', int), 
                             ('timestamp', np.float32),
@@ -176,6 +177,7 @@ if __name__ == "__main__":
     camera_widget.fish_folder_generated.connect(stim_manager.set_fish_folder)
     # camera_widget.terminate_pressed.connect(stim_manager.stop)
     camera_widget.zmq_trigger.connect(stim_manager.start)
+    camera_widget.zmq_abort.connect(stim_manager.stop)
     # stim_manager.stim_started.connect(twop_sender.pause)
     stim_manager.stim_number_set.connect(camera_widget.set_stim_number)
     stim_manager.trial_index_set.connect(camera_widget.set_trial_index)

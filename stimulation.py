@@ -9,6 +9,8 @@ import time
 import numpy as np
 import copy
 import json
+import random
+import threading
 
 # TODO: check if time.perf_counter_ns() / windows high-res timer works better
 # TODO: update method without shuffle
@@ -16,6 +18,8 @@ import json
 # TODO: implement terminate method 
 # TODO: checkbox for receiving trigger from scanimage 
 # TODO: rethink interval calculation
+# TODO: new stimulation manager with moving / visual stim
+# TODO: implement logging for PWM timing from both labjack and pulsesender 
 
 class StimManager(QWidget):
 
@@ -43,6 +47,8 @@ class StimManager(QWidget):
         self.led_driver = led_driver
         self.mask_manager.draw_complete.connect(self.update_draw_display)
         self.thread_pool = QThreadPool()
+
+        self.start_stim = None
 
         self.create_components()
         self.layout_components()
@@ -201,13 +207,19 @@ class StimManager(QWidget):
             # self.mask_keys = list(self.mask_widgets.keys())
             mask_keys_copy = list(copy.deepcopy(self.mask_keys)) 
             reps = self.rep_spinbox.value()
+            n_masks = len(np.unique(mask_keys_copy))
             if reps > 1:
-                mask_keys_copy = [key for key in mask_keys_copy for _ in range(reps)]
+                mask_keys_reps = [key for key in mask_keys_copy for _ in range(reps)]
+                if n_masks > 2:
                 # np.random.shuffle(mask_keys_copy) #returns None!
-                mask_keys_copy = self.shuffle_no_consecutive(mask_keys_copy)
+                    shuffled_masks = self.shuffle_no_consecutive(mask_keys_reps)
+                else: 
+                    shuffled_masks = random.sample(mask_keys_reps, len(mask_keys_reps))
+
             else: 
-                np.random.shuffle(mask_keys_copy) 
-            self.shuffled_mask_keys = mask_keys_copy
+                shuffled_masks = random.sample(mask_keys_copy, len(mask_keys_copy))
+
+            self.shuffled_mask_keys = shuffled_masks
             print(self.shuffled_mask_keys)
             self.shuffled_mask_names = [self.mask_widgets[key].name 
                                         for key in self.shuffled_mask_keys]
@@ -271,6 +283,10 @@ class StimManager(QWidget):
         self.led_dial_value = self.led_dial_spinbox.value()
 
     def start(self):
+        if self.start_stim is not None and not self.start_stim.finished:
+            print('Stimulation already running')
+            return
+        
         self.start_stim_button.setEnabled(False)
         self.set_number_of_elements()
         self.start_stim = StartStim(stim_manager=self, 
@@ -279,7 +295,11 @@ class StimManager(QWidget):
         self.stim_started.emit()
 
     def stop(self):
-        self.start_stim.active = False
+        if self.start_stim is None or self.start_stim.finished:
+            print('No stimulation running')
+            return
+        self.start_stim.abort_event.set()
+
 
     # def disable_widget(self):
     #     self.setEnabled(False)
@@ -291,6 +311,7 @@ class StimManager(QWidget):
         self.start_stim_button.setEnabled(True)
 
     def generate_metadata(self):
+        n_completed = self.start_stim.n_completed
         stim_metadata = {
             'fish_id': str(self.fish_id), 
             'stim_number': self.stim_number,
@@ -300,9 +321,11 @@ class StimManager(QWidget):
             'led_power': self.start_stim.led_dial,
             'pwm_frequency': self.freq_spinbox.value(), 
             'pwm_duty_cycle': self.intensity_slider.value(),
-            'pulse_start': list(self.start_stim.pulse_start), 
-            'pulse_end': list(self.start_stim.pulse_end), 
-            'pulse_duration': list(self.start_stim.pulse_duration)
+            'pulse_start': list(self.start_stim.pulse_start[:n_completed]), 
+            'pulse_end': list(self.start_stim.pulse_end[:n_completed]), 
+            'pulse_duration': list(self.start_stim.pulse_duration[:n_completed]),
+            'n_completed': n_completed,
+            'aborted': self.start_stim.abort_event.is_set()
         }
 
         metadata_path = Path(self.stim_folder_path / ('stim' + str(self.stim_number) + '.json'))
@@ -331,12 +354,15 @@ class StartStim(QRunnable):
         
         super().__init__(*args, **kwargs)
 
-        self.active = True 
+        self.finished = False
         self.stim_manager = stim_manager
         self.led_driver = led_driver
-
+        self.led_dial = self.stim_manager.led_dial_value
+        
         self.stim_protocol_signal = StimProtocolSignal()
-        self.trial_signal = TrialSignal()
+        self.trial_signal = TrialSignal() 
+
+        self.abort_event = threading.Event()
 
         self.trial_signal.trial_index.connect(self.stim_manager.trial_index_set)
         self.trial_signal.trial_start.connect(self.stim_manager.trial_started)
@@ -349,55 +375,68 @@ class StartStim(QRunnable):
         self.pulse_end = np.zeros(self.stim_manager.n_elements)
         self.pulse_duration = np.zeros(self.stim_manager.n_elements)
 
+    def is_aborted(self, duration) -> bool:
+        """ Returns True if aborted during wait """
+        aborted = self.abort_event.wait(timeout=duration)
+        if aborted:
+            print('Stimulation aborted')
+            self.finished = True 
+        return aborted
+
     def run(self):
-        # if self.active:
         if self.stim_manager.shuffled_mask_keys:
-            for i, key in enumerate(self.stim_manager.shuffled_mask_keys):
+            keys_to_use = self.stim_manager.shuffled_mask_keys
+        else:
+            keys_to_use = self.stim_manager.mask_keys
+        try: 
+            for i, key in enumerate(keys_to_use):
                 self.trial_signal.trial_index.emit(i) #0-based trial indexing
-                time.sleep(1) #give time for CameraWidget to receive trial index
+                # time.sleep(1) #give time for CameraWidget to receive trial index
+                if self.is_aborted(1):
+                    break
 
                 self.trial_signal.trial_start.emit() #start_recording() triggered 
                 print('trial start signal emitted: ', time.monotonic_ns())
                 print('trial index: ', i)
-                time.sleep(self.stim_manager.baseline_duration_input.value()) #start recording baseline first before exposing mask 
-                
+                # time.sleep(self.stim_manager.baseline_duration_input.value()) #start recording baseline first before exposing mask 
+                if self.is_aborted(self.stim_manager.baseline_duration_input.value()):
+                    break
+
                 self.stim_manager.mask_expose.emit(key)
                 print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                time.sleep(1) #time.sleep given because sending command for mask exposure takes time
-                
-                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
-                time.sleep(self.stim_manager.recording_duration_input.value())
+                # time.sleep(1) #time.sleep given because sending command for mask exposure takes time
+                if self.is_aborted(1):
+                    break
+
+                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value(), abort_event=self.abort_event)
+                # time.sleep(self.stim_manager.recording_duration_input.value())
+
+                aborted = self.is_aborted(self.stim_manager.recording_duration_input.value())
+                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
+                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
+                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                self.n_completed = i + 1
+
                 self.trial_signal.trial_end.emit()
-                # interval = self.stim_manager.interval - self.stim_manager.recording_duration_input.value()
+
                 interval = self.stim_manager.interval
-                time.sleep(interval)
 
-                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
-                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
-                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
-                self.led_dial = self.stim_manager.led_dial_value
-                
-                if not self.active:
-                    break 
+                if aborted: 
+                    break
+                else:
+                    if self.is_aborted(interval):
+                        break
 
-        else: 
-            for key in self.stim_manager.mask_keys:
-                self.stim_manager.mask_expose.emit(key)
-                print('Mask ' + self.stim_manager.mask_widgets[key].name + ' exposed')
-                time.sleep(1)
-                self.led_driver.pulse(duration_ms=self.stim_manager.duration_spinbox.value())
-                time.sleep(self.stim_manager.interval_spinbox.value())
-
-                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
-                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
-                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
-                if not self.active:
-                    break 
-    
         # additional 1s before automatically ending the recording 
-        time.sleep(1)
-    
-        self.stim_protocol_signal.protocol_ended.emit()
+            time.sleep(1)
+
+        finally:
+            self.led_driver.off()
+            self.trial_signal.trial_end.emit()
+            self.stim_protocol_signal.protocol_ended.emit()
+            self.finished = True
+
+
 
 
 

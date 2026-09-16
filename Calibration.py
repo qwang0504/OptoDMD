@@ -13,6 +13,11 @@ from numpy.typing import NDArray
 import cv2
 from image_tools import regular_polygon, star
 import json
+from pypylon import pylon
+
+# TODO: update camera_tools package if necessary
+# TODO: update GUI for better scanimage integration 
+# TODO: update for Basler camera API
 
 def create_calibration_pattern(div: int, height: int, width: int) -> NDArray:
     
@@ -73,7 +78,15 @@ if __name__ == "__main__":
 
         # get image from camera 
         # cam = XimeaCamera(XIMEA_INDEX)
-        cam = OpenCV_Webcam(0)
+        # cam = OpenCV_Webcam(0)
+        factory = pylon.TlFactory.GetInstance()
+        device_info_list = factory.EnumerateDevices()
+        serial_number = "123456"
+
+        for device_info in device_info_list:
+            if device_info.GetSerialNumber() == serial_number:
+                cam = pylon.InstantCamera(factory.CreateDevice(device_info))
+
         # cam.set_exposure(10000)
         cam.start_acquisition()
         input("Press Enter to grab frame...")

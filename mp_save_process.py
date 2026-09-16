@@ -94,7 +94,7 @@ class SaveProcess(Process):
     def release_file(self):
         self.video_writer.close()
         self.video_writer = None
-        self.save_buffer.clear()
+        # self.save_buffer.clear()
         # self.termination_event.set()
 
     def generate_trial_metadata(self):
