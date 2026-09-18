@@ -60,6 +60,7 @@ class MessageRelay(Process):
                 self.start_event.clear()                
 
             elif msg == 'terminate':
+                self.start_event.clear()
                 self.terminate_event.set()
                 self.front_pipe_cam.send('terminate')
                 self.front_pipe_save.send('terminate')

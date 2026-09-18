@@ -49,6 +49,14 @@ class StimManager(QWidget):
         self.thread_pool = QThreadPool()
 
         self.start_stim = None
+        self.led_dial_value = 0.0
+        self.interval = 0
+        self.fish_number = 0
+        self.stim_number = 0
+        self.shuffled_mask_keys = None
+        self.mask_widgets = {}
+        self.mask_keys = []
+        self.fish_folder = None
 
         self.create_components()
         self.layout_components()
@@ -286,12 +294,16 @@ class StimManager(QWidget):
         if self.start_stim is not None and not self.start_stim.finished:
             print('Stimulation already running')
             return
-        
+
         self.start_stim_button.setEnabled(False)
-        self.set_number_of_elements()
-        self.start_stim = StartStim(stim_manager=self, 
-                                    led_driver=self.led_driver) 
-        self.thread_pool.start(self.start_stim)
+        try:
+            self.set_number_of_elements()
+            self.start_stim = StartStim(stim_manager=self, led_driver=self.led_driver)
+            self.thread_pool.start(self.start_stim)
+        except Exception as e:
+            print(f'could not start stimulation: {e}')
+            self.start_stim_button.setEnabled(True)
+            return
         self.stim_started.emit()
 
     def stop(self):
@@ -317,7 +329,7 @@ class StimManager(QWidget):
             'stim_number': self.stim_number,
             'interval': self.interval_spinbox.value(), 
             'baseline_interval': self.baseline_duration_input.value(),
-            'mask_order': self.shuffled_mask_names, 
+            'mask_order': [self.mask_widgets[key].name for key in self.start_stim.keys_to_use[:n_completed]], 
             'led_power': self.start_stim.led_dial,
             'pwm_frequency': self.freq_spinbox.value(), 
             'pwm_duty_cycle': self.intensity_slider.value(),
@@ -364,6 +376,8 @@ class StartStim(QRunnable):
 
         self.abort_event = threading.Event()
 
+        self.n_completed = 0
+
         self.trial_signal.trial_index.connect(self.stim_manager.trial_index_set)
         self.trial_signal.trial_start.connect(self.stim_manager.trial_started)
         self.trial_signal.trial_end.connect(self.stim_manager.trial_ended)
@@ -380,16 +394,15 @@ class StartStim(QRunnable):
         aborted = self.abort_event.wait(timeout=duration)
         if aborted:
             print('Stimulation aborted')
-            self.finished = True 
         return aborted
 
     def run(self):
         if self.stim_manager.shuffled_mask_keys:
-            keys_to_use = self.stim_manager.shuffled_mask_keys
+            self.keys_to_use = self.stim_manager.shuffled_mask_keys
         else:
-            keys_to_use = self.stim_manager.mask_keys
+            self.keys_to_use = self.stim_manager.mask_keys
         try: 
-            for i, key in enumerate(keys_to_use):
+            for i, key in enumerate(self.keys_to_use):
                 self.trial_signal.trial_index.emit(i) #0-based trial indexing
                 # time.sleep(1) #give time for CameraWidget to receive trial index
                 if self.is_aborted(1):
@@ -412,9 +425,12 @@ class StartStim(QRunnable):
                 # time.sleep(self.stim_manager.recording_duration_input.value())
 
                 aborted = self.is_aborted(self.stim_manager.recording_duration_input.value())
-                self.pulse_start[i] = self.led_driver.pulse_sender.time_start
-                self.pulse_end[i] = self.led_driver.pulse_sender.time_end
-                self.pulse_duration[i] = self.pulse_end[i] - self.pulse_start[i]
+                pulse_start_time = self.led_driver.pulse_sender.time_start
+                pulse_end_time = self.led_driver.pulse_sender.time_end
+                if pulse_start_time is not None and pulse_end_time is not None:
+                    self.pulse_start[i] = pulse_start_time
+                    self.pulse_end[i] = pulse_end_time
+                    self.pulse_duration[i] = pulse_end_time - pulse_start_time
                 self.n_completed = i + 1
 
                 self.trial_signal.trial_end.emit()

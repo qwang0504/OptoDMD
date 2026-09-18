@@ -17,9 +17,6 @@ from pathlib import Path
 import json
 import zmq
 
-# TODO: check if it's better to reuse QThread with event.wait()
-# TODO: add high-res timers
-# TODO: check display buffer size, stop acquisition queue.Full problem
 
 class DisplayWorker(QObject):
     frame_ready = pyqtSignal()
@@ -89,20 +86,19 @@ class ZMQ_worker(QObject):
     def shutdown(self):
         self.active = False
 
+    # def check(self):
+    #     try:
+    #         if self.socket.poll(0):
+    #             ret = self.socket.recv()
+    #             if ret == 'start':
+    #                 print("start trigger received")
+    #                 self.triggered.emit()
+    #             elif ret == 'stop':
+    #                 print('stop trigger received')
+    #                 self.aborted.emit()
 
-    def check(self):
-        try:
-            if self.socket.poll(0):
-                ret = self.socket.recv()
-                if ret == 'start':
-                    print("start trigger received")
-                    self.triggered.emit()
-                elif ret == 'stop':
-                    print('stop trigger received')
-                    self.aborted.emit()
-
-        except zmq.error.ZMQError:
-            pass
+    #     except zmq.error.ZMQError:
+    #         pass
 
     def run(self):
         self.setup()
@@ -390,6 +386,12 @@ class CameraWidget(QWidget):
     def setup_worker(self):
         if self.worker is not None:
             return 
+        while True:
+            try:
+                self.display_buffer.get(timeout=0)
+            except Empty:
+                break
+
         self.worker = DisplayWorker(display_buffer=self.display_buffer)
         self.worker.frame_ready.connect(self.update_display)
         self.qthread = QThread()
@@ -435,21 +437,13 @@ class CameraWidget(QWidget):
         self.record_enabled()
 
     def shutdown(self):
-        if self.worker:
-            self.stop_acquisition()
-            self.display_buffer.put(self.sentinel_array)
-            self.save_buffer.put(self.sentinel_array)
-            self.close_thread()
-            self.front_pipe_gui.send('terminate')
-            # self.terminate_all.emit()
-            self.zmq_worker.shutdown()
-            self.qthread_trigger.quit()
-            self.qthread_trigger.wait(2000)
-            self.close_thread()
-        else:
-            print('DisplayWorker / QThread undefined, nothing to terminate')
-            self.front_pipe_gui.send('terminate')
-            # self.terminate_all.emit()
+        self.stop_acquisition()
+        self.stop_recording()
+        self.close_thread()
+        self.front_pipe_gui.send('terminate')
+        self.zmq_worker.shutdown()
+        self.qthread_trigger.quit()
+        self.qthread_trigger.wait(1000)
 
     def update_display(self):
         try:
@@ -598,12 +592,12 @@ class CameraWidget(QWidget):
     def close_thread(self):
         if self.qthread is None:
             return 
+        self.worker.terminate()
+        self.qthread.quit()
         if not self.qthread.wait(2000):
             print('Warning: display thread did not exit cleanly!')
         self.qthread = None
         self.worker = None
-        # self.qthread.quit()
-        # self.qthread.wait() 
         print('qthread closed, defaults to None')
 
     def closeEvent(self, event):

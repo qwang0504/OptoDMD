@@ -25,6 +25,7 @@ class CameraProcess(Process):
                  camera_constructor: Callable[[int], Camera],
                  display_buffer: ArrayQueue,
                  save_buffer: ArrayQueue,
+                 sentinel_array: np.ndarray,
                  start_event,
                  terminate_event,
                  *args, **kwargs):
@@ -38,6 +39,8 @@ class CameraProcess(Process):
 
         self.display_buffer = display_buffer
         self.save_buffer = save_buffer
+
+        self.sentinel_array = sentinel_array
 
         self.mode = None
         self.active = True
@@ -125,7 +128,8 @@ class CameraProcess(Process):
 
         self.stop_acquisition()
         # fd.close()
-        self.mode = None
+        if self.mode == 'display':
+            self.mode = None
         print('Acquisition stopped, exiting display mode')
 
     def save_mode(self):
@@ -152,8 +156,8 @@ class CameraProcess(Process):
             #     self.previous_qsize = self.current_qsize
 
         self.stop_acquisition()
-        self.save_buffer.put(self.sentinel)
-        self.display_buffer.put(self.sentinel)
+        self.save_buffer.put(self.sentinel_array)
+        # self.display_buffer.put(self.sentinel_array)
         # fs.close()
         # fd.close()
         self.mode = None
@@ -185,7 +189,7 @@ class CameraProcessThreads(Process):
                  save_buffer: ArrayQueue,
                  camera_constructor: Callable[[int], Camera],
                  start_event: threading.Event,
-                 sentinel: np.ndarray,
+                 sentinel_array: np.ndarray,
                  *args, 
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -197,7 +201,7 @@ class CameraProcessThreads(Process):
         
         self.camera_constructor = camera_constructor
         self.start_event = start_event
-        self.sentinel = sentinel
+        self.sentinel_array = sentinel_array
 
         self.display_worker = None
         self.save_worker = None
@@ -230,7 +234,7 @@ class CameraProcessThreads(Process):
                     self.display_worker = BufferRelay(buffer=self.display_buffer,
                                                       camera=self.camera,
                                                       start_event=self.start_event,
-                                                      sentinel=self.sentinel)
+                                                      sentinel_array=self.sentinel_array)
                     self.thread = Thread(target=self.display_worker.run)
                     self.thread.start()
                     self.display_worker.start_acquisition()
@@ -288,12 +292,12 @@ class BufferRelay:
                  buffer: ArrayQueue, 
                  camera: Camera,
                  start_event: threading.Event,
-                 sentinel: np.ndarray):
+                 sentinel_array: np.ndarray):
 
         self.buffer = buffer
         self.camera = camera
         self.start_event = start_event
-        self.sentinel = sentinel
+        self.sentinel_array = sentinel_array
         self.active = True
     
     def start_acquisition(self):

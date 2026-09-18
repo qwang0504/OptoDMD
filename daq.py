@@ -276,15 +276,20 @@ class LabJackU3LV_hl:
                 div = 2**16
 
             # make sure digital value is 0
-            self.digitalWrite(channel,0)
+            # self.digitalWrite(channel,0)
             # why is this necessary? make sure that the channel isn't already sending a signal?
             # it's to turn off the PWM pulse, since pwm() is called twice, once at the start at the pulse, then at the end
 
+            # if duty_cycle == 0:
+            #     # PWM can't fully turn off. Use digital write instead
+            #     # and return
+
+            t_before = time.monotonic_ns()
+            self.digitalWrite(channel, 0)
+            t_after = time.monotonic_ns()
             if duty_cycle == 0:
-                # PWM can't fully turn off. Use digital write instead
-                # and return
-                return
-            
+                return t_before, t_after
+
             # divisor should be in the range 0-255, 0 corresponds to a divisor of 256  
             timer_clock_divisor = int( (self.clock_freq * 1e6)/(frequency * div) ) #48 MHz / (frequency * divisor)
             
@@ -301,10 +306,13 @@ class LabJackU3LV_hl:
             value = int(65535*(1-duty_cycle))
 
             # Configure the timer for 16-bit PWM
-            time_start_pwm = time.monotonic_ns()
+            lj_command_start = time.monotonic_ns()
             self.device.getFeedback(u3.TimerConfig(timer=0, TimerMode=timer_mode, Value=value))
-            print('start_pwm: ', time_start_pwm)
-            return time_start_pwm
+            lj_command_end = time.monotonic_ns()
+            # print('lj_command_start: ', lj_command_start)
+            # print('lj_command_end: ', lj_command_end)
+
+            return lj_command_start, lj_command_end
 
     def pwm_ttl(self, pwm_channel: int, gating_channel: int, duty_cycle: float, frequency: float) -> None:
         
@@ -363,6 +371,7 @@ class LabJackU3LV_hl:
         self.device.getFeedback(u3.TimerConfig(timer=1, TimerMode=timer_mode, Value=gating_value))
         print('start_pwm: ', time_start_pwm)
         print(gating_channel)
+        return time_start_pwm
 
     def close(self) -> None:
         with self.lock:

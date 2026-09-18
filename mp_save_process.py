@@ -132,24 +132,44 @@ class SaveProcess(Process):
                 frame_count_path = Path(self.output_dir) / self.fish_id / self.stim_folder
                 frame_count_filepath = frame_count_path / frame_count_filename
                 fd = open(str(frame_count_filepath), 'w')
+
             frame_count = 0
             while self.active:
                 frame = self.save_buffer.get()
-                if frame_count == 0:
-                    self.video_start_time_save = time.monotonic_ns()
-                    # print(f'video_start_time_SAVE = {time.monotonic_ns()}')
-                if frame['image'].sum() > 0:
-                    self.video_writer.write_frame(frame['image'])
-                    if self.trial_index is not None:
-                        fd.write(f"{frame['index']}, {frame['timestamp']}\n")
-                    frame_count += 1
-                else:
-                    # self.save_buffer.clear()
+
+                if frame['index'] < 0:
                     if self.trial_index is not None:
                         fd.close()
                     self.release_file()
                     self.generate_trial_metadata()
                     break
+
+                if frame_count == 0:
+                    self.video_start_time_save = time.monotonic_ns()
+                self.video_writer.write_frame(frame['image'])
+
+                if self.trial_index is not None:
+                    fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+
+                frame_count += 1
+
+                # frame = self.save_buffer.get()
+                # if frame_count == 0:
+                #     self.video_start_time_save = time.monotonic_ns()
+                #     # print(f'video_start_time_SAVE = {time.monotonic_ns()}')
+                # if frame['image'].sum() > 0:
+                #     self.video_writer.write_frame(frame['image'])
+                #     if self.trial_index is not None:
+                #         fd.write(f"{frame['index']}, {frame['timestamp']}\n")
+                #     frame_count += 1
+                # else:
+                #     # self.save_buffer.clear()
+                #     if self.trial_index is not None:
+                #         fd.close()
+                #     self.release_file()
+                #     self.generate_trial_metadata()
+                #     break
+
             print('File saving finished')
 
         print('SaveProcess finished, exiting')

@@ -42,6 +42,8 @@ class PulseSender(QRunnable):
         self.pwm_frequency = pwm_frequency
         self.gating_channel = gating_channel
         self.abort_event = abort_event or threading.Event()
+        self.time_start = None
+        self.time_end = None
 
     def run(self):
 

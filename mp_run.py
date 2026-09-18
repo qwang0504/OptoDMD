@@ -23,8 +23,6 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThreadPool
 
 # TODO: close sockets cleanly
-# TODO: include abort / stop for stimulation! 
-# TODO: fix issue where first frame of video is last frame of previous video 
 # TODO: calibration method for Basler Dart camera 
 # TODO: fix metadata issue with default values 
 # TODO: make default video name trial id / date-based 
@@ -111,7 +109,8 @@ if __name__ == "__main__":
                                    display_buffer=display_buffer,
                                    save_buffer=save_buffer,
                                    start_event=start_event,
-                                   terminate_event=terminate_event)
+                                   terminate_event=terminate_event,
+                                   sentinel_array=sentinel)
     
     relay_process = MessageRelay(back_pipe_gui=back_pipe_gui,
                                  front_pipe_cam=front_pipe_cam,
